@@ -2,6 +2,7 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <Eigen/Dense>
 
 namespace sphericalsfm {
     typedef Eigen::Vector3d Point;

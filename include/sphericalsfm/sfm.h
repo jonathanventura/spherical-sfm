@@ -51,6 +51,8 @@ namespace sphericalsfm {
     public:
         SfM( const Intrinsics &_intrinsics );
         
+        Intrinsics GetIntrinsics() const { return intrinsics; }
+        
         int AddCamera( const Pose &initial_pose, const std::string &path = "" );
         int AddPoint( const Point &initial_position, const cv::Mat &descriptor = cv::Mat() );
         void AddObservation( int camera, int point, const Observation &observation );

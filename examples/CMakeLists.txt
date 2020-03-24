@@ -5,10 +5,7 @@ add_library( utils utils.h utils.cpp )
 target_link_libraries( utils ${OpenCV_LIBS} )
 
 add_executable( run_spherical_sfm
-    feature_tracking.h feature_tracking.cpp
-    #loop_closure.h loop_closure.cpp
-    #rotation_averaging.h rotation_averaging.cpp
-    #bundle_adjustment.h bundle_adjustment.cpp
+    spherical_sfm_tools.h spherical_sfm_tools.cpp
     run_spherical_sfm.cpp
 )
 target_link_libraries( run_spherical_sfm sphericalsfm utils )

@@ -9,7 +9,7 @@
 
 #include <sphericalsfm/spherical_estimator.h>
 #include <sphericalsfm/so3.h>
-
+#include <iostream>
 namespace sphericalsfm {
     int SphericalEstimator::sampleSize()
     {
@@ -51,9 +51,13 @@ namespace sphericalsfm {
             A.row(i) << u(0)*v(0) - u(1)*v(1), u(0)*v(1) + u(1)*v(0), u(2)*v(0), u(2)*v(1), u(0)*v(2), u(1)*v(2);
         }
         
-        // replace with QR(A.') --> last rows of Q are nullspace
-        Eigen::MatrixXd Q = A.transpose().colPivHouseholderQr().householderQ();
+        Eigen::MatrixXd Q = A.jacobiSvd(Eigen::ComputeFullU | Eigen::ComputeFullV).matrixV();
+//        std::cout << " V size: " << Q.rows() << " " << Q.cols() << "\n";
         Eigen::Matrix<double,6,3> B = Q.block(0,3,6,3);
+        
+        // replace with QR(A.') --> last rows of Q are nullspace
+//        Eigen::MatrixXd Q = A.transpose().colPivHouseholderQr().householderQ();
+//        Eigen::Matrix<double,6,3> B = Q.block(0,3,6,3);
 
         const double t2 = B(0,0)*B(0,0);
         const double t3 = 2*t2;
