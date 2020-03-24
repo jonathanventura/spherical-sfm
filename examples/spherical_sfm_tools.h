@@ -31,6 +31,8 @@ namespace sphericalsfmtools {
         Eigen::Matrix3d R;
         ImageMatch( const int _index0, const int _index1, const Matches &_matches, const Eigen::Matrix3d &_R ) :
         index0(_index0), index1(_index1), matches(_matches), R(_R) { }
+    public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
     void build_feature_tracks( const sphericalsfm::Intrinsics &intrinsics, const std::string &videopath,

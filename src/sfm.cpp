@@ -4,6 +4,7 @@
 #include <ceres/loss_function.h>
 #include <ceres/autodiff_cost_function.h>
 
+#include <Eigen/Jacobi>
 #include <Eigen/SVD>
 #include <Eigen/LU>
 
@@ -178,7 +179,8 @@ namespace sphericalsfm {
                 n++;
             }
 
-            Eigen::Vector4d Xh = A.jacobiSvd( Eigen::ComputeFullV ).matrixV().col(3);
+            Eigen::JacobiSVD<Eigen::MatrixXd> svdA(A,Eigen::ComputeFullV);
+            Eigen::Vector4d Xh = svdA.matrixV().col(3);
             Eigen::Vector3d X = Xh.head(3)/Xh(3);
 
             SetPoint( j, X );
@@ -386,10 +388,27 @@ namespace sphericalsfm {
             if ( i == numCameras ) points.erase(j);
         }
     }
-    
-    void SfM::WritePointsOBJ( const char *path )
+
+    void SfM::WritePoses( const std::string &path )
     {
-        FILE *f = fopen( path, "w" );
+        FILE *f = fopen( path.c_str(), "w" );
+        
+        for ( int i = 0; i < numCameras; i++ )
+        {
+            Camera camera = cameras(i);
+            for ( int j = 0; j < 6; j++ )
+            {
+                fprintf(f,"%.15lf ",camera(j));
+            }
+            fprintf(f,"\n");
+        }
+
+        fclose(f);
+    }
+    
+    void SfM::WritePointsOBJ( const std::string &path )
+    {
+        FILE *f = fopen( path.c_str(), "w" );
 
         std::vector<int> nobs(numPoints);
         std::vector<double> distances(numPoints);
@@ -426,9 +445,9 @@ namespace sphericalsfm {
         fclose( f );
     }
 
-    void SfM::WriteCameraCentersOBJ( const char *path )
+    void SfM::WriteCameraCentersOBJ( const std::string &path )
     {
-        FILE *f = fopen( path, "w" );
+        FILE *f = fopen( path.c_str(), "w" );
         
         for ( int i = 0; i < numCameras; i++ )
         {

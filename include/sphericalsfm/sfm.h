@@ -86,8 +86,11 @@ namespace sphericalsfm {
         void SetTranslationFixed( int camera, bool fixed ) { translationFixed[camera] = fixed; }
         void SetPointFixed( int point, bool fixed ) { pointFixed[point] = fixed; }
         
-        void WritePointsOBJ( const char *path );
-        void WriteCameraCentersOBJ( const char *path );
+        void WritePoses( const std::string &path );
+        void WritePointsOBJ( const std::string &path );
+        void WriteCameraCentersOBJ( const std::string &path );
+    public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 }
 

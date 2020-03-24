@@ -393,6 +393,7 @@ namespace sphericalsfmtools {
     void build_sfm( const std::vector<Features> &features, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
                    sphericalsfm::SfM &sfm )
     {
+        std::cout << "building tracks\n";
         std::vector< std::vector<int> > tracks(features.size());
         for ( int i = 0; i < features.size(); i++ )
         {
@@ -404,6 +405,7 @@ namespace sphericalsfmtools {
         }
         
         // add cameras
+        std::cout << "adding cameras\n";
         for ( int index = 0; index < features.size(); index++ )
         {
             int camera = sfm.AddCamera( Pose( Eigen::Vector3d(0,0,-1), so3ln(rotations[index]) ) );
@@ -467,7 +469,8 @@ namespace sphericalsfmtools {
                 }
             }
         }
-        
+
+        std::cout << "retriangulating...\n";
         sfm.Retriangulate();
     }
 

@@ -13,6 +13,7 @@ using namespace sphericalsfmtools;
 
 DEFINE_string(intrinsics, "", "Path to intrinsics (focal centerx centery)");
 DEFINE_string(video, "", "Path to video or image search pattern like frame%06d.png");
+DEFINE_string(output, "", "Path to output directory");
 DEFINE_double(inlierthresh, 2.0, "Inlier threshold in pixels");
 DEFINE_double(minrot, 1.0, "Minimum rotation between keyframes");
 DEFINE_int32(mininliers, 100, "Minimum number of inliers to accept a loop closure");
@@ -44,15 +45,19 @@ int main( int argc, char **argv )
     std::vector<Eigen::Matrix3d> rotations;
     initialize_rotations( features.size(), image_matches, rotations );
 
+    std::cout << "building sfm\n";
     SfM sfm( intrinsics );
     build_sfm( features, image_matches, rotations, sfm );
     
-    sfm.WritePointsOBJ( "pre-ba-points.obj" );
-    sfm.WriteCameraCentersOBJ( "pre-ba-cameras.obj" );
+    sfm.WritePointsOBJ( FLAGS_output + "/pre-ba-points.obj" );
+    sfm.WriteCameraCentersOBJ( FLAGS_output + "/pre-ba-cameras.obj" );
     
+    std::cout << "running optimization\n";
     sfm.Optimize();
+    std::cout << "done.\n";
     
-    sfm.WritePointsOBJ( "points.obj" );
-    sfm.WriteCameraCentersOBJ( "cameras.obj" );
-
+    sfm.WritePoses( FLAGS_output + "/poses.txt" );
+    sfm.WritePointsOBJ( FLAGS_output + "/points.obj" );
+    sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras.obj" );
 }
+

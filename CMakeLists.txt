@@ -21,6 +21,8 @@ include_directories( ${OPENCV_INCLUDE_DIRS} )
 find_package( Eigen3 REQUIRED )
 include_directories( ${EIGEN3_INCLUDE_DIR} )
 
+find_package( OpenMVG REQUIRED )
+
 include_directories( include )
 add_library( sphericalsfm
     include/sphericalsfm/ray.h
@@ -38,6 +40,9 @@ add_library( sphericalsfm
 target_compile_features( sphericalsfm PRIVATE cxx_alias_templates )
 target_link_libraries( sphericalsfm ${CERES_LIBRARIES} )
 target_link_libraries( sphericalsfm ${OpenCV_LIBS} )
+target_link_libraries( sphericalsfm OpenMVG::openMVG_multiview )
+target_compile_features( sphericalsfm PRIVATE cxx_alias_templates )
+target_compile_options( sphericalsfm PRIVATE ${OPENMVG_CFLAGS} )
 
 add_subdirectory( examples )
 
