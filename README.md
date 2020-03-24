@@ -1,2 +1,1 @@
-# spherical-sfm
-Spherical Structure-from-Motion in C++
+## Spherical Structure-from-Motion
