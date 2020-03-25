@@ -123,6 +123,9 @@ canvas {
       </details>
     </header>
     <script type="module">
+      let urlParams = new URLSearchParams(window.location.search);
+      let name = urlParams.get('name')
+
       import {WebXRButton} from './js/util/webxr-button.js';
       import {Scene, WebXRView} from './js/render/scenes/scene.js';
       import {Renderer, createWebGLContext} from './js/render/core/renderer.js';
@@ -148,7 +151,7 @@ canvas {
       let renderer = null;
       let scene = new Scene();
       scene.addNode(new SkyboxNode({
-        url: 'images/street.png',
+        url: 'images/' + name + '.png',
         displayMode: 'stereoTopBottom'
       }));
 
