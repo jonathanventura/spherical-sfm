@@ -17,9 +17,7 @@
 #include <sphericalsfm/spherical_estimator.h>
 #include <sphericalsfm/preemptive_ransac.h>
 #include <sphericalsfm/so3.h>
-
-#include <openMVG/multiview/rotation_averaging_l1.hpp>
-#include <openMVG/multiview/rotation_averaging_l2.hpp>
+#include <sphericalsfm/rotation_averaging.h>
 
 #include "spherical_sfm_tools.h"
 
@@ -147,7 +145,7 @@ namespace sphericalsfmtools {
     }
 
     void build_feature_tracks( const Intrinsics &intrinsics, const std::string &videopath,
-                              std::vector<Features> &features, std::vector<ImageMatch> &image_matches,
+                              std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
                               const double inlier_threshold, const double min_rot )
     {
         bool inward = false;
@@ -172,7 +170,8 @@ namespace sphericalsfmtools {
 
         Features features0;
         detectortracker.detect( image0, features0 );
-        features.push_back(features0);
+        
+        keyframes.push_back(Keyframe(0,features0));
 
         std::cout << "detected " << features0.size() << " features in image 0\n";
         
@@ -185,8 +184,9 @@ namespace sphericalsfmtools {
             estimators[i] = new SphericalEstimator;
         }
 
+        int kf_index = 1;
+        int video_index = 1;
         cv::Mat image1_in, image1;
-        int index = 1;
         while ( cap.read( image1_in ) )
         {
             if ( image1_in.channels() == 3 ) cv::cvtColor( image1_in, image1, cv::COLOR_BGR2GRAY );
@@ -197,7 +197,7 @@ namespace sphericalsfmtools {
             Matches m01;
             
             detectortracker.track( image0, image1, features0, features1, m01 );
-            std::cout << "tracked " << features1.size() << " features in image " << index << "\n";
+            std::cout << "tracked " << features1.size() << " features in image " << video_index << "\n";
 
             std::vector<bool> inliers;
             int ninliers;
@@ -229,7 +229,7 @@ namespace sphericalsfmtools {
             
             ninliers = ransac.compute( ray_pair_list.begin(), ray_pair_list.end(), estimators, (Estimator**)&best_estimator, inliers );
             
-            fprintf( stdout, "%d: %lu matches and %d inliers (%0.2f%%)\n", index, m01.size(), ninliers, (double)ninliers/(double)m01.size()*100 );
+            fprintf( stdout, "%d: %lu matches and %d inliers (%0.2f%%)\n", video_index, m01.size(), ninliers, (double)ninliers/(double)m01.size()*100 );
 
             Eigen::Vector3d best_estimator_t;
             Eigen::Vector3d best_estimator_r;
@@ -237,7 +237,10 @@ namespace sphericalsfmtools {
             std::cout << best_estimator_r.transpose() << "\n";
 
             // check for minimum rotation
-            if ( best_estimator_r.norm() < min_rot * M_PI / 180. ) continue;
+            if ( best_estimator_r.norm() < min_rot * M_PI / 180. ) {
+                video_index++;
+                continue;
+            }
 
             Matches m01inliers;
             size_t i = 0;
@@ -265,14 +268,14 @@ namespace sphericalsfmtools {
             detectortracker.detect( image0, features0 );
             std::cout << "after sift, features0 now has " << features0.size() << " features\n";
 
-            features.push_back(features0);
-            
-            image_matches.push_back( ImageMatch( index-1, index, new_m01, so3exp(best_estimator_r) ) );
-            index++;
+            keyframes.push_back(Keyframe(video_index,features0));
+            image_matches.push_back( ImageMatch( kf_index-1, kf_index, new_m01, so3exp(best_estimator_r) ) );
+            video_index++;
+            kf_index++;
         }
     }
 
-    void make_loop_closures( const Intrinsics &intrinsics, const std::vector<Features> &features, std::vector<ImageMatch> &image_matches,
+    void make_loop_closures( const Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
                             const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end )
     {
         Eigen::Matrix3d K0inv = intrinsics.getKinv();
@@ -287,18 +290,18 @@ namespace sphericalsfmtools {
         }
                 
         int count0 = 0;
-        for ( int index0 = 0; index0 < features.size(); index0++ )
+        for ( int index0 = 0; index0 < keyframes.size(); index0++ )
         {
             if ( ++count0 > num_frames_begin ) break;
 
-            const Features &features0 = features[index0];
+            const Features &features0 = keyframes[index0].features;
             
             int count1 = 0;
-            for ( int index1 = features.size()-1; index1 >= index0+1; index1-- )
+            for ( int index1 = keyframes.size()-1; index1 >= index0+1; index1-- )
             {
                 if ( ++count1 > num_frames_end ) break;
                             
-                const Features &features1 = features[index1];
+                const Features &features1 = keyframes[index1].features;
 
                 Matches m01;
                 
@@ -361,8 +364,6 @@ namespace sphericalsfmtools {
 
     void initialize_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations )
     {
-        openMVG::rotation_averaging::RelativeRotations RelRs;
-        
         rotations.resize(num_cameras);
         for ( int i = 0 ; i < num_cameras; i++ ) rotations[i] = Eigen::Matrix3d::Identity();
         
@@ -381,24 +382,24 @@ namespace sphericalsfmtools {
             }
         }
         
+        std::vector<RelativeRotation> relative_rotations;
         for ( int i = 0; i < image_matches.size(); i++ )
         {
-            std::cout << image_matches[i].index0 << "\t" << image_matches[i].index1 << "\t" << image_matches[i].R << "\n";
-            RelRs.push_back( openMVG::rotation_averaging::RelativeRotation( image_matches[i].index0, image_matches[i].index1, image_matches[i].R ) );
+            relative_rotations.push_back( RelativeRotation( image_matches[i].index0, image_matches[i].index1, image_matches[i].R ) );
         }
         
-//        openMVG::rotation_averaging::l2::L2RotationAveraging_Refine( RelRs, rotations );
+        optimize_rotations( rotations, relative_rotations );
     }
 
-    void build_sfm( const std::vector<Features> &features, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
+    void build_sfm( const std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
                    sphericalsfm::SfM &sfm )
     {
         std::cout << "building tracks\n";
-        std::vector< std::vector<int> > tracks(features.size());
-        for ( int i = 0; i < features.size(); i++ )
+        std::vector< std::vector<int> > tracks(keyframes.size());
+        for ( int i = 0; i < keyframes.size(); i++ )
         {
-            tracks[i].resize( features[i].size() );
-            for ( int j = 0; j < features[i].size(); j++ )
+            tracks[i].resize( keyframes[i].features.size() );
+            for ( int j = 0; j < keyframes[i].features.size(); j++ )
             {
                 tracks[i][j] = -1;
             }
@@ -406,22 +407,25 @@ namespace sphericalsfmtools {
         
         // add cameras
         std::cout << "adding cameras\n";
-        for ( int index = 0; index < features.size(); index++ )
+        for ( int index = 0; index < keyframes.size(); index++ )
         {
             int camera = sfm.AddCamera( Pose( Eigen::Vector3d(0,0,-1), so3ln(rotations[index]) ) );
             sfm.SetRotationFixed( camera, (index==0) );
             sfm.SetTranslationFixed( camera, true );
         }
 
+        std::cout << "adding tracks\n";
+        std::cout << "number of keyframes is " << keyframes.size() << "\n";
         for ( int i = 0; i < image_matches.size(); i++ )
         {
             const Matches &m01 = image_matches[i].matches;
             
             const int index0 = image_matches[i].index0;
             const int index1 = image_matches[i].index1;
+            std::cout << "match between keyframes " << index0 << " and " << index1 << " has " << m01.size() << " matches\n";
             
-            const Features &features0 = features[index0];
-            const Features &features1 = features[index1];
+            const Features &features0 = keyframes[index0].features;
+            const Features &features1 = keyframes[index1].features;
             
             for ( Matches::const_iterator it = m01.begin(); it != m01.end(); it++ )
             {
@@ -461,7 +465,7 @@ namespace sphericalsfmtools {
                     // update all features with track1 and set to track0
                     for ( int i = 0; i < tracks.size(); i++ )
                     {
-                        for ( int j = 0; j < tracks[j].size(); j++ )
+                        for ( int j = 0; j < tracks[i].size(); j++ )
                         {
                             if ( tracks[i][j] == track1 ) tracks[i][j] = track0;
                         }

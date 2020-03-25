@@ -5,9 +5,9 @@ add_executable( run_spherical_sfm
 )
 target_link_libraries( run_spherical_sfm sphericalsfm )
 target_link_libraries( run_spherical_sfm ${OpenCV_LIBS} )
-target_link_libraries( run_spherical_sfm OpenMVG::openMVG_multiview )
 target_compile_features( run_spherical_sfm PRIVATE cxx_alias_templates )
-target_compile_options( run_spherical_sfm PRIVATE ${OPENMVG_CFLAGS} )
+#target_link_libraries( run_spherical_sfm OpenMVG::openMVG_multiview )
+#target_compile_options( run_spherical_sfm PRIVATE ${OPENMVG_CFLAGS} )
 
 set( BUILD_STITCHER FALSE CACHE BOOL "Build stereo panorama stitcher app (requires Cuda)" )
 if ( BUILD_STITCHER )

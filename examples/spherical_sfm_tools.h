@@ -24,6 +24,14 @@ namespace sphericalsfmtools {
     };
     typedef std::vector<Feature> Features;
 
+    struct Keyframe
+    {
+        int index;
+        Features features;
+        Keyframe( const int _index, const Features &_features ) :
+        index(_index), features(_features) { }
+    };
+
     struct ImageMatch
     {
         int index0, index1;
@@ -36,14 +44,14 @@ namespace sphericalsfmtools {
     };
 
     void build_feature_tracks( const sphericalsfm::Intrinsics &intrinsics, const std::string &videopath,
-                              std::vector<Features> &features, std::vector<ImageMatch> &image_matches,
+                              std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
                               const double inlier_threshold, const double min_rot );
 
-    void make_loop_closures( const sphericalsfm::Intrinsics &intrinsics, const std::vector<Features> &features, std::vector<ImageMatch> &image_matches,
+    void make_loop_closures( const sphericalsfm::Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
                             const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end );
 
     void initialize_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
 
-    void build_sfm( const std::vector<Features> &features, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
+    void build_sfm( const std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
                    sphericalsfm::SfM &sfm );
 }

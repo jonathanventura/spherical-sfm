@@ -30,24 +30,24 @@ int main( int argc, char **argv )
     
     std::cout << "intrinsics : " << focal << ", " << centerx << ", " << centery << "\n";
 
-    sphericalsfm::Intrinsics intrinsics(focal,centerx,centery);
+    Intrinsics intrinsics(focal,centerx,centery);
     
     std::cout << "tracking features in video: " << FLAGS_video << "\n";
 
-    std::vector<Features> features;
+    std::vector<Keyframe> keyframes;
     std::vector<ImageMatch> image_matches;
-    build_feature_tracks( intrinsics, FLAGS_video, features, image_matches, FLAGS_inlierthresh, FLAGS_minrot );
+    build_feature_tracks( intrinsics, FLAGS_video, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_minrot );
     
     std::cout << "detecting loop closures\n";
-    make_loop_closures( intrinsics, features, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend );
+    make_loop_closures( intrinsics, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend );
     
     std::cout << "initializing rotations\n";
     std::vector<Eigen::Matrix3d> rotations;
-    initialize_rotations( features.size(), image_matches, rotations );
+    initialize_rotations( keyframes.size(), image_matches, rotations );
 
     std::cout << "building sfm\n";
     SfM sfm( intrinsics );
-    build_sfm( features, image_matches, rotations, sfm );
+    build_sfm( keyframes, image_matches, rotations, sfm );
     
     sfm.WritePointsOBJ( FLAGS_output + "/pre-ba-points.obj" );
     sfm.WriteCameraCentersOBJ( FLAGS_output + "/pre-ba-cameras.obj" );
@@ -56,7 +56,9 @@ int main( int argc, char **argv )
     sfm.Optimize();
     std::cout << "done.\n";
     
-    sfm.WritePoses( FLAGS_output + "/poses.txt" );
+    std::vector<int> keyframe_indices(keyframes.size());
+    for ( int i = 0; i < keyframes.size(); i++ ) keyframe_indices[i] = keyframes[i].index;
+    sfm.WritePoses( FLAGS_output + "/poses.txt", keyframe_indices );
     sfm.WritePointsOBJ( FLAGS_output + "/points.obj" );
     sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras.obj" );
 }

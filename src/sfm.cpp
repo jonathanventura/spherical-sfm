@@ -389,12 +389,14 @@ namespace sphericalsfm {
         }
     }
 
-    void SfM::WritePoses( const std::string &path )
+    void SfM::WritePoses( const std::string &path, const std::vector<int> &indices )
     {
+        assert(indices.size() == numCameras);
         FILE *f = fopen( path.c_str(), "w" );
         
         for ( int i = 0; i < numCameras; i++ )
         {
+            fprintf(f,"%d ",indices[i]);
             Camera camera = cameras(i);
             for ( int j = 0; j < 6; j++ )
             {

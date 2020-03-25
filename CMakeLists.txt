@@ -21,7 +21,7 @@ include_directories( ${OPENCV_INCLUDE_DIRS} )
 find_package( Eigen3 REQUIRED )
 include_directories( ${EIGEN3_INCLUDE_DIR} )
 
-find_package( OpenMVG REQUIRED )
+#find_package( OpenMVG REQUIRED )
 
 include_directories( include )
 add_library( sphericalsfm
@@ -36,13 +36,13 @@ add_library( sphericalsfm
     include/sphericalsfm/spherical_estimator.h src/spherical_estimator.cpp
     include/sphericalsfm/plane_estimator.h src/plane_estimator.cpp
     include/sphericalsfm/spherical_utils.h src/spherical_utils.cpp
+    include/sphericalsfm/rotation_averaging.h src/rotation_averaging.cpp
 )
 target_compile_features( sphericalsfm PRIVATE cxx_alias_templates )
 target_link_libraries( sphericalsfm ${CERES_LIBRARIES} )
 target_link_libraries( sphericalsfm ${OpenCV_LIBS} )
-target_link_libraries( sphericalsfm OpenMVG::openMVG_multiview )
-target_compile_features( sphericalsfm PRIVATE cxx_alias_templates )
-target_compile_options( sphericalsfm PRIVATE ${OPENMVG_CFLAGS} )
+#target_link_libraries( sphericalsfm OpenMVG::openMVG_multiview )
+#target_compile_options( sphericalsfm PRIVATE ${OPENMVG_CFLAGS} )
 
 add_subdirectory( examples )
 
