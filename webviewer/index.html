@@ -150,6 +150,7 @@ canvas {
       let gl = null;
       let renderer = null;
       let scene = new Scene();
+      scene.enableStats(false);
       scene.addNode(new SkyboxNode({
         url: 'images/' + name + '.png',
         displayMode: 'stereoTopBottom'
