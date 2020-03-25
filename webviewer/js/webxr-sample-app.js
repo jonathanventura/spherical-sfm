@@ -38,7 +38,8 @@ export class WebXRSampleApp {
     this.gl = null;
     this.renderer = null;
     this.scene = new Scene();
-
+    this.scene.enableStats(false);
+    
     this.xrButton = new WebXRButton({
       onRequestSession: () => { return this.onRequestSession(); },
       onEndSession: (session) => { this.onEndSession(session); }
