@@ -341,6 +341,50 @@ namespace stereopanotools {
         }
     }
 
+    cv::Mat convert_to_spherical(const Intrinsics &intrinsics, const cv::Mat &cylindrical )
+    {
+        const int height = cylindrical.cols/2;
+        double vertfov = 2. * atan2(cylindrical.rows,2.*intrinsics.focal);
+        
+        // do vertical remap first
+        // make lookup table for vertical remap
+        std::vector<double> lut(height);
+        
+        double minphi = -M_PI/2;
+        double maxphi = M_PI/2;
+        double phistep = (maxphi-minphi)/(height-1);
+        
+        for ( int phinum = 0; phinum < height; phinum++ )
+        {
+            double phi = minphi + phinum*phistep;
+            double H = tan(phi);
+            lut[phinum] = intrinsics.focal*H+intrinsics.centery;
+        }
+        
+        // now remap columns of cylindrical panorama
+        cv::Mat spherical(height,cylindrical.cols,CV_8UC3);
+        
+        for ( int y = 0; y < height; y++ )
+        {
+            if ( std::isinf(lut[y]) || std::isnan(lut[y]) ) continue;
+            if ( lut[y] < 0 || lut[y] >= cylindrical.rows ) continue;
+            cv::Mat patch;
+            cv::getRectSubPix(cylindrical,cv::Size(cylindrical.cols,1),cv::Point2f(cylindrical.cols/2.f,lut[y]),patch);
+            patch.copyTo(spherical.row(y));
+        }
+
+        // resize horizontally if necessary
+        cv::Mat spherical_resized;
+        if ( spherical.cols != 2*height )
+        {
+            cv::resize( spherical, spherical_resized, cv::Size(2*height,height) );
+        } else {
+            spherical_resized = spherical;
+        }
+        
+        return spherical_resized;
+    }
+
     void make_stereo_panoramas( const Intrinsics &intrinsics, const std::string &videopath, const std::string &outputpath,
         const int panowidth )
     {
@@ -549,10 +593,21 @@ namespace stereopanotools {
           
         }
         
+        std::vector<cv::Mat> spherical_panos(panoramas.size());
+        for ( int i = 0; i < panoramas.size(); i++ )
+        {
+            spherical_panos[i] = convert_to_spherical(intrinsics, panoramas[i]);
+        }
         for ( int phinum = 0; phinum < nphi; phinum++ )
         {
-            double phi = phirange[phinum];
-            cv::imwrite(outputpath + "/cylindrical" + std::to_string(phinum) + ".png" ,panoramas[phinum]);
+            cv::imwrite(outputpath + "/cylindrical" + std::to_string(phinum) + ".png", panoramas[phinum]);
+            cv::imwrite(outputpath + "/spherical" + std::to_string(phinum) + ".png", spherical_panos[phinum]);
+        }
+        for ( int phinum = 0; phinum < nphi/2; phinum++ )
+        {
+            cv::Mat overunder;
+            cv::vconcat(spherical_panos[nphi-phinum-1],spherical_panos[phinum],overunder);
+            cv::imwrite(outputpath + "/overunder" + std::to_string(nphi-phinum-1) + std::to_string(phinum) + ".png", overunder);
         }
     }
 }
