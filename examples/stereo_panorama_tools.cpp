@@ -608,6 +608,7 @@ namespace stereopanotools {
             cv::Mat overunder;
             cv::vconcat(spherical_panos[nphi-phinum-1],spherical_panos[phinum],overunder);
             cv::imwrite(outputpath + "/overunder" + std::to_string(nphi-phinum-1) + std::to_string(phinum) + ".png", overunder);
+            cv::imwrite(outputpath + "/overunder" + std::to_string(nphi-phinum-1) + std::to_string(phinum) + ".jpg", overunder);
         }
     }
 }

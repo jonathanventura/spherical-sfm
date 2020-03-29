@@ -126,19 +126,19 @@ namespace sphericalsfmtools {
         
         Eigen::Matrix3d Kinv = intrinsics.getKinv();
         
-        //cv::VideoCapture cap(videopath);
+        cv::VideoCapture cap(videopath);
         
         cv::Mat image0_in, image0;
-        //if ( !cap.read(image0_in) )
-        //{
-            //std::cout << "error: could not read single frame from " << videopath << "\n";
-            //exit(1);
-        //}
-        //if ( image0_in.channels() == 3 ) cv::cvtColor( image0_in, image0, cv::COLOR_BGR2GRAY );
-        //else image0 = image0_in;
-        char imagepath[1024];
-        sprintf(imagepath,videopath.c_str(),1);
-        image0 = cv::imread(imagepath,cv::IMREAD_GRAYSCALE);
+        if ( !cap.read(image0_in) )
+        {
+            std::cout << "error: could not read single frame from " << videopath << "\n";
+            exit(1);
+        }
+        if ( image0_in.channels() == 3 ) cv::cvtColor( image0_in, image0, cv::COLOR_BGR2GRAY );
+        else image0 = image0_in;
+        //char imagepath[1024];
+        //sprintf(imagepath,videopath.c_str(),1);
+        //image0 = cv::imread(imagepath,cv::IMREAD_GRAYSCALE);
         
         int xradius = image0.cols/48;
         int yradius = image0.rows/48;
@@ -173,13 +173,13 @@ namespace sphericalsfmtools {
         int kf_index = 1;
         int video_index = 1;
         cv::Mat image1_in, image1;
-        while ( true )//cap.read( image1_in ) )
+        while ( cap.read( image1_in ) )
         {
-            //if ( image1_in.channels() == 3 ) cv::cvtColor( image1_in, image1, cv::COLOR_BGR2GRAY );
-            //else image1 = image1_in;
-            sprintf(imagepath,videopath.c_str(),video_index+1);
-            image1 = cv::imread(imagepath,cv::IMREAD_GRAYSCALE);
-            if ( image1.rows == 0 ) break;
+            if ( image1_in.channels() == 3 ) cv::cvtColor( image1_in, image1, cv::COLOR_BGR2GRAY );
+            else image1 = image1_in;
+            //sprintf(imagepath,videopath.c_str(),video_index+1);
+            //image1 = cv::imread(imagepath,cv::IMREAD_GRAYSCALE);
+            //if ( image1.rows == 0 ) break;
 
             Features features1;
             
