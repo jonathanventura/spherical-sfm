@@ -3,10 +3,12 @@
 #include <vector>
 #include <cmath>
 #include <fstream>
+#include <cstdlib>
 
 #include <gflags/gflags.h>
 
 #include "spherical_sfm_tools.h"
+#include "spherical_sfm_io.h"
 
 using namespace sphericalsfm;
 using namespace sphericalsfmtools;
@@ -19,9 +21,12 @@ DEFINE_double(minrot, 1.0, "Minimum rotation between keyframes");
 DEFINE_int32(mininliers, 100, "Minimum number of inliers to accept a loop closure");
 DEFINE_int32(numbegin, 30, "Number of frames at beginning of sequence to use for loop closure");
 DEFINE_int32(numend, 30, "Number of frames at end of sequence to use for loop closure");
+DEFINE_bool(bestonly, false, "Accept only the best loop closure");
 
 int main( int argc, char **argv )
 {
+    srand(0);
+
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     
     double focal, centerx, centery;
@@ -32,18 +37,39 @@ int main( int argc, char **argv )
 
     Intrinsics intrinsics(focal,centerx,centery);
     
-    std::cout << "tracking features in video: " << FLAGS_video << "\n";
-
     std::vector<Keyframe> keyframes;
     std::vector<ImageMatch> image_matches;
-    build_feature_tracks( intrinsics, FLAGS_video, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_minrot );
+    if ( !read_feature_tracks( FLAGS_output, keyframes, image_matches ) )
+    {
+        std::cout << "tracking features in video: " << FLAGS_video << "\n";
+
+        build_feature_tracks( intrinsics, FLAGS_video, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_minrot );
+        write_feature_tracks( FLAGS_output, keyframes, image_matches ); 
+    }
+    else
+    {
+        read_images( FLAGS_video, keyframes );
+    }
     
     std::cout << "detecting loop closures\n";
-    make_loop_closures( intrinsics, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend );
+    int loop_closure_count = make_loop_closures( intrinsics, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend, FLAGS_bestonly );
+    if ( FLAGS_bestonly ) std::cout << "only using best loop closure\n";
+    if ( loop_closure_count == 0 ) 
+    {
+        std::cout << "error: no loop closures found\n";
+        exit(1);
+    }
     
     std::cout << "initializing rotations\n";
     std::vector<Eigen::Matrix3d> rotations;
     initialize_rotations( keyframes.size(), image_matches, rotations );
+
+    SfM pre_loop_closure_sfm( intrinsics );
+    build_sfm( keyframes, image_matches, rotations, pre_loop_closure_sfm );
+    pre_loop_closure_sfm.WriteCameraCentersOBJ( FLAGS_output + "/pre-loop-cameras.obj" );
+
+    std::cout << "refining rotations\n";
+    refine_rotations( keyframes.size(), image_matches, rotations );
 
     std::cout << "building sfm\n";
     SfM sfm( intrinsics );

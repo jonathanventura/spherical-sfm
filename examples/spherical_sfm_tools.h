@@ -13,6 +13,7 @@ namespace sphericalsfmtools {
     typedef std::pair<size_t,size_t> Match;
     typedef std::map<size_t,size_t> Matches;
 
+/*
     struct Feature
     {
         float x, y;
@@ -23,11 +24,21 @@ namespace sphericalsfmtools {
         
     };
     typedef std::vector<Feature> Features;
+*/
+    struct Features
+    {
+        std::vector<cv::Point2f> points;
+        cv::Mat descs;
+        Features() : descs(0,128,CV_32F) { }
+        int size() const { return points.size(); }
+        bool empty() const { return points.empty(); }
+    };
 
     struct Keyframe
     {
         int index;
         Features features;
+        cv::Mat image;
         Keyframe( const int _index, const Features &_features ) :
         index(_index), features(_features) { }
     };
@@ -47,10 +58,11 @@ namespace sphericalsfmtools {
                               std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
                               const double inlier_threshold, const double min_rot );
 
-    void make_loop_closures( const sphericalsfm::Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
-                            const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end );
+    int make_loop_closures( const sphericalsfm::Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
+                            const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end, const bool best_only );
 
     void initialize_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
+    void refine_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
 
     void build_sfm( const std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
                    sphericalsfm::SfM &sfm );

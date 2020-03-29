@@ -46,6 +46,9 @@ namespace sphericalsfm {
         ceres::LossFunction* loss_function = new ceres::SoftLOneLoss(0.03);
         for ( int i = 0; i < relative_rotations.size(); i++ )
         {
+            std::cout << relative_rotations[i].index0 << "\n";
+            std::cout << relative_rotations[i].index1 << "\n";
+            std::cout << relative_rotations[i].R << "\n";
             RotationError *error = new RotationError(relative_rotations[i].R);
             ceres::CostFunction* cost_function = new ceres::AutoDiffCostFunction<RotationError, 3, 3, 3>(error);
             problem.AddResidualBlock(cost_function,
@@ -56,7 +59,7 @@ namespace sphericalsfm {
         }
     
         ceres::Solver::Options options;
-        options.linear_solver_type = ceres::DENSE_NORMAL_CHOLESKY;
+        options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
         options.minimizer_progress_to_stdout = true;
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);

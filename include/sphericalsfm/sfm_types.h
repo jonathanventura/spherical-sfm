@@ -36,7 +36,8 @@ namespace sphericalsfm {
         focal(_focal), centerx(_centerx), centery(_centery) { }
         Eigen::Matrix3d getK() const {
             Eigen::Matrix3d K = Eigen::Matrix3d::Identity();
-            K(0,0) = K(1,1) = focal;
+            K(0,0) = focal;
+            K(1,1) = focal;
             K(0,2) = centerx;
             K(1,2) = centery;
             return K;

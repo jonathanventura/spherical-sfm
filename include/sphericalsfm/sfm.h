@@ -16,6 +16,7 @@ namespace sphericalsfm {
     class SfM
     {
     protected:
+        friend class ParallelTriangulator;
         Intrinsics intrinsics;
         
         SparseVector<Camera> cameras;          // m cameras

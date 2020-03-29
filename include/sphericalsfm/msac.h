@@ -33,21 +33,18 @@ namespace sphericalsfm {
         double init_outlier_ratio;
         int iter; // number of iterations performed
         
-        MSAC( double _prob_success = 0.99, double _init_outlier_ratio = 0.8 )
+        MSAC( double _prob_success = 0.999, double _init_outlier_ratio = 0.8 )
 
         : prob_success( _prob_success ), init_outlier_ratio( _init_outlier_ratio )
         {
             
         }
 
-        void compute_num_iterations( double outlier_ratio, int sample_size, int &num_iter )
+        void compute_num_iterations( double outlier_ratio, int sample_size, double &num_iter )
         {
             double num = log(1.-prob_success);
             double den = log(1.-pow(1.-outlier_ratio,sample_size));
-            if ( fabs(den) > 1e-5 )
-            {
-                num_iter = ceil(num/den);
-            }
+            num_iter = num/den;
         }
         
         void count_inliers( EstimatorType *estimator, double threshsq,
@@ -79,7 +76,7 @@ namespace sphericalsfm {
             
             ListType random_subset( m );
             
-            int num_iter = estimators.size();
+            double num_iter = estimators.size();
             
             double best_score = INFINITY;
             int num_inliers = 0;
@@ -90,12 +87,7 @@ namespace sphericalsfm {
             while ( iter < num_iter && iter < estimators.size() )
             {
                 // generate a random sample
-                bool valid = false;
-                while ( !valid )
-                {
-                    random_sample(begin, N, random_subset.begin(), m );
-                    valid = estimators[iter]->isValid( random_subset.begin(), random_subset.end() );
-                }
+                random_sample(begin, N, random_subset.begin(), m );
                 
                 // compute solution
                 int nsolns = estimators[iter]->compute( random_subset.begin(), random_subset.end() );
@@ -134,55 +126,6 @@ namespace sphericalsfm {
                 }
                 
                 iter++;
-            }
-            std::cout << "num iterations: " << iter << "\n";
-
-            // re-compute using all inliers
-            if ( false ) //(*best_estimator)->canRefine() )
-            {
-                std::cout << "number of inliers from minimal samples: " << num_inliers << "\n";
-                std::cout << "score from minimal samples: " << best_score << "\n";
-                
-                // reset best score
-                best_score = INFINITY;
-                
-                bool should_recompute = true;
-                
-                while ( should_recompute )
-                {
-                    should_recompute = false;
-                    
-                    ListType inlier_list;
-                    inlier_list.reserve(num_inliers);
-                    for ( size_t i = 0; i < N; i++ )
-                    {
-                        if ( !inliers[i] ) continue;
-                        inlier_list.push_back(*(begin+i));
-                    }
-                    int nsolns = (*best_estimator)->compute( inlier_list.begin(), inlier_list.end() );
-                    
-                    // choose solution which has best average score for all inliers
-                    int best_index = 0;
-                    for ( int j = 0; j < nsolns; j++ )
-                    {
-                        (*best_estimator)->chooseSolution(j);
-                        
-                        double my_score = 0;
-                        int my_num_inliers = 0;
-                        count_inliers( (*best_estimator), threshsq, begin, end, my_inliers, my_num_inliers, my_score );
-                        std::cout << "\tsoln " << j << ": " << my_num_inliers << " " << my_score << "\n";
-                        if ( my_score < best_score )
-                        {
-                            best_score = my_score;
-                            best_index = j;
-                            inliers = my_inliers;
-                            num_inliers = my_num_inliers;
-                            std::cout << "\tnum inliers now " << num_inliers << "\n";
-                            should_recompute = true;
-                        }
-                    }
-                    (*best_estimator)->chooseSolution(best_index);
-                }
             }
             
             return num_inliers;

@@ -10,10 +10,71 @@
 
 #include <iostream>
 
+#include <opencv2/core/utility.hpp>
+
 #include <sphericalsfm/sfm.h>
 #include <sphericalsfm/so3.h>
 
 namespace sphericalsfm {
+
+    class ParallelTriangulator : public cv::ParallelLoopBody
+    {
+    public:
+        ParallelTriangulator( SfM &_sfm ) :sfm(_sfm) { }
+        virtual void operator()(const cv::Range &range) const CV_OVERRIDE
+        {
+            for ( int j = range.start; j < range.end; j++ )
+            {
+                if ( !sfm.points.exists(j) ) continue;
+                
+                int firstcam = -1;
+                int lastcam = -1;
+                
+                int nobs = 0;
+                for ( int i = 0; i < sfm.numCameras; i++ )
+                {
+                    if ( !sfm.cameras.exists(i) ) continue;
+                    if ( !( sfm.observations.exists(i,j) ) ) continue;
+                    if ( firstcam == -1 ) firstcam = i;
+                    lastcam = i;
+                    nobs++;
+                }
+
+                sfm.SetPoint( j, Eigen::Vector3d::Zero() );
+                if ( nobs < 3 ) continue;
+
+                Eigen::MatrixXd A( nobs*2, 4 );
+                 
+                int n = 0;
+                for ( int i = 0; i < sfm.numCameras; i++ )
+                {
+                    if ( !sfm.cameras.exists(i) ) continue;
+                    if ( !( sfm.observations.exists(i,j) ) ) continue;
+
+                    Observation vec = sfm.observations(i,j);
+
+                    Eigen::Vector2d point(vec(0)/sfm.intrinsics.focal,vec(1)/sfm.intrinsics.focal);
+                    Eigen::Matrix4d P = sfm.GetPose(i).P;
+                    
+                    A.row(2*n+0) = P.row(2) * point[0] - P.row(0);
+                    A.row(2*n+1) = P.row(2) * point[1] - P.row(1);
+                    n++;
+                }
+
+                Eigen::JacobiSVD<Eigen::MatrixXd> svdA(A,Eigen::ComputeFullV);
+                Eigen::Vector4d Xh = svdA.matrixV().col(3);
+                Eigen::Vector3d X = Xh.head(3)/Xh(3);
+
+                sfm.SetPoint( j, X );
+            }
+        }
+        ParallelTriangulator& operator=(const ParallelTriangulator &) {
+            return *this;
+        }
+    private:
+        SfM &sfm;
+    };
+    
     struct ReprojectionError
     {
         ReprojectionError( double _focal, double _x, double _y )
@@ -141,7 +202,9 @@ namespace sphericalsfm {
 
     void SfM::Retriangulate()
     {
-        for ( int j = 0; j < numPoints; j++ )
+        cv::parallel_for_(cv::Range(0,numPoints), [&](const cv::Range &range){
+        //for ( int j = 0; j < numPoints; j++ )
+        for ( int j = range.start; j < range.end; j++ )
         {
             if ( !points.exists(j) ) continue;
             
@@ -185,6 +248,7 @@ namespace sphericalsfm {
 
             SetPoint( j, X );
         }
+        });
     }
 
     void SfM::PreOptimize()
@@ -199,6 +263,7 @@ namespace sphericalsfm {
         options.max_num_iterations = 1000;
         options.max_num_consecutive_invalid_steps = 100;
         options.minimizer_progress_to_stdout = true;
+        options.num_threads = 16;
     }
 
     void SfM::AddResidual( ceres::Problem &problem, int camera, int point )

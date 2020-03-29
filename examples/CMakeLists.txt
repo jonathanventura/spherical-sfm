@@ -1,6 +1,7 @@
 
 add_executable( run_spherical_sfm
     spherical_sfm_tools.h spherical_sfm_tools.cpp
+    spherical_sfm_io.h spherical_sfm_io.cpp
     run_spherical_sfm.cpp
 )
 target_link_libraries( run_spherical_sfm sphericalsfm )

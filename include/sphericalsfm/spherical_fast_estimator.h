@@ -5,7 +5,7 @@
 #include <sphericalsfm/estimator.h>
 
 namespace sphericalsfm {
-    struct SphericalEstimator : public Estimator
+    struct SphericalFastEstimator : public Estimator
     {
         Eigen::Matrix3d Esolns[4];
         

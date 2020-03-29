@@ -34,6 +34,7 @@ add_library( sphericalsfm
     include/sphericalsfm/msac.h
     include/sphericalsfm/preemptive_ransac.h
     include/sphericalsfm/spherical_estimator.h src/spherical_estimator.cpp
+    include/sphericalsfm/spherical_fast_estimator.h src/spherical_fast_estimator.cpp
     include/sphericalsfm/plane_estimator.h src/plane_estimator.cpp
     include/sphericalsfm/spherical_utils.h src/spherical_utils.cpp
     include/sphericalsfm/rotation_averaging.h src/rotation_averaging.cpp

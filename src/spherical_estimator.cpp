@@ -6,10 +6,11 @@
 #include <Eigen/Eigenvalues>
 
 #include <cmath>
+#include <iostream>
 
 #include <sphericalsfm/spherical_estimator.h>
 #include <sphericalsfm/so3.h>
-#include <iostream>
+
 namespace sphericalsfm {
     int SphericalEstimator::sampleSize()
     {
@@ -243,9 +244,7 @@ namespace sphericalsfm {
         return nsolns;
     }
 
-    void SphericalEstimator::decomposeE( bool inward,
-                                        RayPairList::iterator begin, RayPairList::iterator end, const std::vector<bool> &inliers,
-                                        Eigen::Vector3d &r, Eigen::Vector3d &t )
+    void SphericalEstimator::decomposeE( bool inward, Eigen::Vector3d &r, Eigen::Vector3d &t )
     {
         Eigen::JacobiSVD<Eigen::Matrix3d> svdE(E,Eigen::ComputeFullU|Eigen::ComputeFullV);
         
