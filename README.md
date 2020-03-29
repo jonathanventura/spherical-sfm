@@ -10,10 +10,10 @@ Ventura, J., "Structure from Motion on a Sphere", European Conference on Compute
 
 ### Dependencies
 
-OpenCV 3+
-Ceres solver
-Eigen 3+
-[Polynomial](https://github.com/jonathanventura/polynomial)
+* OpenCV 3+
+* Ceres solver
+* Eigen 3+
+* [Polynomial](https://github.com/jonathanventura/polynomial)
 
 ### Usage
 
