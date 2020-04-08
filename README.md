@@ -18,7 +18,7 @@ Ventura, J., "Structure from Motion on a Sphere", European Conference on Compute
 
 ### Usage
 
-If your images have radial distortion, first undistort them using =:
+If your images have radial distortion, first undistort them using:
 
     undistort_images -intrinsics <path to intrinsics with distortion> -intrinsicsout <path for output intrinsics file> -video <path to video> -output <path ot folder for undistorted images> -rotate <rotation>
     
