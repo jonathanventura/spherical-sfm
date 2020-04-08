@@ -18,6 +18,12 @@ Ventura, J., "Structure from Motion on a Sphere", European Conference on Compute
 
 ### Usage
 
+If your images have radial distortion, first undistort them using =:
+
+    undistort_images -intrinsics <path to intrinsics with distortion> -video <path to video> -output <path ot folder for undistorted images> -rotate <rotation>
+    
+The "rotate" parameter is the number of clockwise 90 degree rotations to apply (useful for iPhone videos, for example).
+
 To run the spherical structure-from-motion pipeline:
 
     run_spherical_sfm -intrinsics <path to intrinsics> -video <path to video> -output <path to output>
