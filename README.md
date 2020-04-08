@@ -27,6 +27,11 @@ To make the stereo panoramas:
 
     make_stereo_panorama -intrinsics <path to intrinsics> -video <path to video> -output <path to output>
 
+### Capture tips
+
+* Hold the camera in an outstretched hand and turn in a roughly level and complete circle (close the loop).  Don't go too far over the loop closure point (no more than 30 degrees beyond the starting point).
+* The code currently does not support radial distortion parameters.  If you have significant radial distortion then you should undistort the images first.
+
 ### Examples
 
 You can view these example panoramas in a WebVR-compatible browser or headset.
