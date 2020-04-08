@@ -12,11 +12,12 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgproc.hpp>
 
-DEFINE_string(intrinsics, "", "Path to intrinsics (focalx focaly centerx centery k1 k2 p1 p2 k3 k4 k5 k6)");
+DEFINE_string(intrinsics, "distorted.txt", "Path to input intrinsics (focalx focaly centerx centery k1 k2 p1 p2 k3 k4 k5 k6)");
+DEFINE_string(intrinsicsout, "intrinsics.txt", "Path to output intrinsics (focal centerx centery)");
 DEFINE_int32(rotate, 0, "Rotation to apply to input video (0 for none, 1 for 90 degrees CW, 2 for 180, 3 for 270");
 DEFINE_double(focal, 0, "Output focal length (defaults to (focalx+focaly)/2)");
-DEFINE_string(video, "", "Path to video or image search pattern like frame%06d.png");
-DEFINE_string(output, "", "Path to output directory for undistorted frames (must exist)");
+DEFINE_string(video, "%06d.png", "Path to video or image search pattern like %06d.png");
+DEFINE_string(output, "output", "Path to output directory for undistorted frames (must exist)");
 
 int main( int argc, char **argv )
 {
@@ -81,5 +82,9 @@ int main( int argc, char **argv )
         
         video_index++;
     }
+    
+    FILE *intrinsicsout = fopen( FLAGS_intrinsicsout.c_str(), "w" );
+    fprintf( intrinsicsout, "%.15lf %.15lf %.15lf", focal, centerx, centery );
+    fclose( intrinsicsout );
 }
 
