@@ -20,7 +20,7 @@ Ventura, J., "Structure from Motion on a Sphere", European Conference on Compute
 
 If your images have radial distortion, first undistort them using =:
 
-    undistort_images -intrinsics <path to intrinsics with distortion> -video <path to video> -output <path ot folder for undistorted images> -rotate <rotation>
+    undistort_images -intrinsics <path to intrinsics with distortion> -intrinsicsout <path for output intrinsics file> -video <path to video> -output <path ot folder for undistorted images> -rotate <rotation>
     
 The "rotate" parameter is the number of clockwise 90 degree rotations to apply (useful for iPhone videos, for example).
 
@@ -28,7 +28,7 @@ To run the spherical structure-from-motion pipeline:
 
     run_spherical_sfm -intrinsics <path to intrinsics> -video <path to video> -output <path to output>
 
-The video path can be an image filename specifier such as %06d.png.
+The video path can be an image filename specifier such as %06d.png.  The intrinsics file should contain the focal length, center x, and center y separated by spaces.
 
 To make the stereo panoramas:
 
