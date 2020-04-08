@@ -37,7 +37,7 @@ add_library( sphericalsfm
     include/sphericalsfm/spherical_utils.h src/spherical_utils.cpp
     include/sphericalsfm/rotation_averaging.h src/rotation_averaging.cpp
 )
-target_compile_features( sphericalsfm PRIVATE cxx_alias_templates )
+#target_compile_features( sphericalsfm PRIVATE cxx_alias_templates )
 target_link_libraries( sphericalsfm ${CERES_LIBRARIES} )
 target_link_libraries( sphericalsfm ${OpenCV_LIBS} )
 
