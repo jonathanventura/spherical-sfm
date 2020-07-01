@@ -22,6 +22,7 @@ DEFINE_int32(mininliers, 100, "Minimum number of inliers to accept a loop closur
 DEFINE_int32(numbegin, 30, "Number of frames at beginning of sequence to use for loop closure");
 DEFINE_int32(numend, 30, "Number of frames at end of sequence to use for loop closure");
 DEFINE_bool(bestonly, false, "Accept only the best loop closure");
+DEFINE_bool(noloopclosure, false, "Allow there to be no loop closures");
 
 int main( int argc, char **argv )
 {
@@ -54,7 +55,7 @@ int main( int argc, char **argv )
     std::cout << "detecting loop closures\n";
     int loop_closure_count = make_loop_closures( intrinsics, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend, FLAGS_bestonly );
     if ( FLAGS_bestonly ) std::cout << "only using best loop closure\n";
-    if ( loop_closure_count == 0 ) 
+    if ( !FLAGS_noloopclosure && loop_closure_count == 0 ) 
     {
         std::cout << "error: no loop closures found\n";
         exit(1);
