@@ -18,6 +18,7 @@ DEFINE_int32(rotate, 0, "Rotation to apply to input video (0 for none, 1 for 90 
 DEFINE_double(focal, 0, "Output focal length (defaults to (focalx+focaly)/2)");
 DEFINE_string(video, "%06d.png", "Path to video or image search pattern like %06d.png");
 DEFINE_string(output, "output", "Path to output directory for undistorted frames (must exist)");
+DEFINE_int32(startframe, 0, "Index of starting frame");
 
 int main( int argc, char **argv )
 {
@@ -28,6 +29,9 @@ int main( int argc, char **argv )
     double focalx, focaly, centerx, centery, k1, k2, p1, p2, k3, k4, k5, k6;
     std::ifstream intrinsicsf( FLAGS_intrinsics );
     intrinsicsf >> focalx >> focaly >> centerx >> centery >> k1 >> k2 >> p1 >> p2 >> k3 >> k4 >> k5 >> k6;
+    std::cout << "input intrinsics:\n";
+    std::cout << focalx << " " << focaly << " " << centerx << " " << centery << "\n";
+    std::cout << k1 << " " << k2 << " " << p1 << " " << p2 << " " << k3 << " " << k4 << " " << k5 << " " << k6 << "\n";
 
     cv::Mat cameraMatrix = cv::Mat::eye(3,3,CV_64F);
     cameraMatrix.at<double>(0,0) = focalx;
@@ -58,12 +62,10 @@ int main( int argc, char **argv )
 
     cv::VideoCapture cap(FLAGS_video);
     int video_index = 0;
-    cv::Mat image_in, image_distorted;
-    while ( cap.read(image_in) )
+    int output_index = 0;
+    cv::Mat image_distorted;
+    while ( cap.read(image_distorted) )
     {
-        if ( image_in.channels() == 3 ) cv::cvtColor( image_in, image_distorted, cv::COLOR_BGR2GRAY );
-        else image_in.copyTo(image_distorted);
-        
         if ( FLAGS_rotate == 1 ) cv::rotate(image_distorted, image_distorted, cv::ROTATE_90_CLOCKWISE);
         else if ( FLAGS_rotate == 2 ) cv::rotate(image_distorted, image_distorted, cv::ROTATE_180);
         else if ( FLAGS_rotate == 3 ) cv::rotate(image_distorted, image_distorted, cv::ROTATE_90_COUNTERCLOCKWISE);
@@ -72,14 +74,20 @@ int main( int argc, char **argv )
         {
             cv::initUndistortRectifyMap(cameraMatrix, distCoeffs, cv::noArray(), newCameraMatrix, image_distorted.size(), CV_32FC1, map1, map2 );
         }
+
+        if ( video_index < FLAGS_startframe ) {
+            video_index++;
+            continue;
+        }
         
         cv::Mat image_undistorted;
         cv::remap( image_distorted, image_undistorted, map1, map2, cv::INTER_CUBIC );
         
         char path[1024];
-        sprintf(path,"%s/%06d.png",FLAGS_output.c_str(),video_index);
+        sprintf(path,"%s/%06d.png",FLAGS_output.c_str(),output_index);
         cv::imwrite( path, image_undistorted );
         
+        output_index++;
         video_index++;
     }
     
