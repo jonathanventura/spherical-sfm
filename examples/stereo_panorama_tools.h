@@ -32,7 +32,7 @@ namespace stereopanotools {
     };
 
     void make_stereo_panoramas( const sphericalsfm::Intrinsics &intrinsics, const std::string &videopath, const std::string &outputpath,
-        const int panowidth ); 
+        const int panowidth, const bool is_loop ); 
 
 }
 

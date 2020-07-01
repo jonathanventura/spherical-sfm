@@ -303,6 +303,7 @@ namespace stereopanotools {
         
         // calculate rotation to correct up vector
         Eigen::Matrix3d correction = get_rotation( up, Eigen::Vector3d(0,1,0) );
+        std::cout << "correction rotation:\n" << correction << "\n";
         std::cout << "corrected up vector:\n" << correction * up << "\n";
         
         // c = -R.' * t
@@ -386,7 +387,7 @@ namespace stereopanotools {
     }
 
     void make_stereo_panoramas( const Intrinsics &intrinsics, const std::string &videopath, const std::string &outputpath,
-        const int panowidth )
+        const int panowidth, const bool is_loop )
     {
         const int start_theta = 0;
         const int end_theta = panowidth;
@@ -427,16 +428,19 @@ namespace stereopanotools {
         bool reverse = ( nneg > npos );
         
         // remove end frames that overlap with beginning frames
-        if ( reverse )
+        if ( is_loop )
         {
-            while ( keyframes.back().theta < keyframes[0].theta )
+            if ( reverse )
             {
-                keyframes.pop_back();
-            }
-        } else {
-            while ( keyframes.back().theta > keyframes[0].theta )
-            {
-                keyframes.pop_back();
+                while ( keyframes.back().theta < keyframes[0].theta )
+                {
+                    keyframes.pop_back();
+                }
+            } else {
+                while ( keyframes.back().theta > keyframes[0].theta )
+                {
+                    keyframes.pop_back();
+                }
             }
         }
         
@@ -502,6 +506,7 @@ namespace stereopanotools {
         for ( int kfnum = 0; kfnum < keyframes.size(); kfnum++ )
         {
           if ( kfnum % 10 == 0 ) std::cout << kfnum+1 << " / " << keyframes.size() << "\n";
+          if ( !is_loop && kfnum == keyframes.size()-1 ) break;
 
           int leftnum = kfnum;
           int rightnum = (kfnum+1)%keyframes.size();
@@ -580,6 +585,7 @@ namespace stereopanotools {
               bool success = synthesize_column_flowbased( intrinsics.focal, intrinsics.centerx, intrinsics.centery, theta, phi, alpha, left, right, left_image_float, right_image_float, forward_flow, backward_flow, synth_column );
               if ( !success ) continue;
               found_one_theta = true;
+              std::cout << theta << " " << phi << "\n";
             
               // store column in output panorama
               int colout = thetanum;
