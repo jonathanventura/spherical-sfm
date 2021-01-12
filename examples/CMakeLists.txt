@@ -1,4 +1,3 @@
-
 find_package(gflags REQUIRED)
 
 add_executable( undistort_images
@@ -14,6 +13,12 @@ add_executable( run_spherical_sfm
 target_link_libraries( run_spherical_sfm sphericalsfm )
 target_link_libraries( run_spherical_sfm ${OpenCV_LIBS} gflags )
 #target_compile_features( run_spherical_sfm PRIVATE cxx_alias_templates )
+
+add_executable( recenter_poses
+    recenter_poses.cpp
+)
+target_link_libraries( recenter_poses sphericalsfm )
+target_link_libraries( recenter_poses gflags )
 
 set( BUILD_STITCHER FALSE CACHE BOOL "Build stereo panorama stitcher app (requires Cuda)" )
 if ( BUILD_STITCHER )

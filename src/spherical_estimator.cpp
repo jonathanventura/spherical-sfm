@@ -9,45 +9,87 @@
 #include <iostream>
 
 #include <sphericalsfm/spherical_estimator.h>
+#include <sphericalsfm/spherical_utils.h>
 #include <sphericalsfm/so3.h>
 
-namespace sphericalsfm {
-    int SphericalEstimator::sampleSize()
-    {
-        return 3;
-    }
+#include <ceres/ceres.h>
+#include <ceres/rotation.h>
+#include <ceres/loss_function.h>
+#include <ceres/autodiff_cost_function.h>
 
-    double SphericalEstimator::score( RayPairList::iterator it )
+namespace sphericalsfm {
+
+    struct SampsonError
     {
-        const Eigen::Vector3d &u = it->first.head(3);
-        const Eigen::Vector3d &v = it->second.head(3);
+        template <typename T>
+        bool operator()(const T* const ri_data,
+                        const T* const ti_data,
+                        const T* const rj_data,
+                        const T* const tj_data,
+                        const T* const u_data,
+                        const T* const v_data,
+                        T* residuals) const
+        {
+            T Ri_data[9];
+            ceres::AngleAxisToRotationMatrix(ri_data,Ri_data);
+            Eigen::Map< const Eigen::Matrix<T,3,3> > Ri(Ri_data);
+            Eigen::Map< const Eigen::Matrix<T,3,1> > ti(ti_data);
+
+            T Rj_data[9];
+            ceres::AngleAxisToRotationMatrix(rj_data,Rj_data);
+            Eigen::Map< const Eigen::Matrix<T,3,3> > Rj(Rj_data);
+            Eigen::Map< const Eigen::Matrix<T,3,1> > tj(tj_data);
+            
+            Eigen::Matrix<T,3,3> R = Rj*Ri.transpose();
+            Eigen::Matrix<T,3,1> t = Rj*(-Ri.transpose()*ti) + tj;
+            
+            Eigen::Matrix<T,3,3> s;
+            s <<
+            T(0), -t[2], t[1],
+            t[2], t(0), -t[0],
+            -t[1], t[0], t(0);
+            Eigen::Matrix<T,3,3> E = s * R;
+
+            Eigen::Map< const Eigen::Matrix<T,3,1> > u(u_data);
+            Eigen::Map< const Eigen::Matrix<T,3,1> > v(v_data);
+
+            Eigen::Matrix<T,3,1> line = E * (u/u(2));
+            T d = v.dot( line );
+        
+            residuals[0] = d / sqrt(line[0]*line[0] + line[1]*line[1]);
+            
+            return true;
+        }
+    };
+    
+    double SphericalEstimator::EvaluateModelOnPoint(const Eigen::Matrix3d& E, int i) const
+    {
+        if ( i > correspondences.size() ) { std::cout << "error: " << i << " / " << correspondences.size() << std::endl; }
+        const RayPair &ray_pair(correspondences[i]);
+        const Eigen::Vector3d &u = ray_pair.first;
+        const Eigen::Vector3d &v = ray_pair.second;
         const Eigen::Vector3d line = E * (u/u(2));
         const double d = v.dot( line );
         
         return (d*d) / (line[0]*line[0] + line[1]*line[1]);
     }
 
-    void SphericalEstimator::chooseSolution( int soln )
+    int SphericalEstimator::MinimalSolver(const std::vector<int>& sample, std::vector<Eigen::Matrix3d>* Es) const
     {
-        E = Esolns[soln];
-    }
-
-    bool SphericalEstimator::canRefine()
-    {
-        return true;
-    }
-
-    int SphericalEstimator::compute( RayPairList::iterator begin, RayPairList::iterator end )
-    {
-        int N = std::distance(begin,end);
+        const int N = sample.size();
+        if ( N < min_sample_size() ) 
+        {
+            std::cout << "bad sample size: " << N << "\n";
+            return 0;
+        }
         
         Eigen::MatrixXd A(N,6);
 
-        int i = 0;
-        for ( RayPairList::iterator it = begin; it != end; it++,i++ )
+        for ( int i = 0 ; i < N; i++ )
         {
-            const Eigen::Vector3d u = it->first.head(3);
-            const Eigen::Vector3d v = it->second.head(3);
+            const int ind = sample[i];
+            const Eigen::Vector3d u = correspondences[ind].first;
+            const Eigen::Vector3d v = correspondences[ind].second;
         
             A.row(i) << u(0)*v(0) - u(1)*v(1), u(0)*v(1) + u(1)*v(0), u(2)*v(0), u(2)*v(1), u(0)*v(2), u(1)*v(2);
         }
@@ -221,8 +263,7 @@ namespace sphericalsfm {
         Eigen::EigenSolver<Eigen::Matrix4d>::EigenvectorsType V = eigM.eigenvectors();
         Eigen::EigenSolver<Eigen::Matrix4d>::EigenvalueType evalues = eigM.eigenvalues();
         
-        int nsolns = 0;
-        
+        Es->clear();
         for ( int i = 0; i < 4; i++ )
         {
             if ( fabs(evalues(i).imag()) > 1e-12 ) continue;
@@ -238,63 +279,81 @@ namespace sphericalsfm {
             
             Esoln /= Esoln.norm();
             
-            Esolns[nsolns++] = Esoln;
+            Es->push_back(Esoln);
         }
         
-        return nsolns;
+        return !( Es->empty() );
     }
-
-    void SphericalEstimator::decomposeE( bool inward, Eigen::Vector3d &r, Eigen::Vector3d &t )
+    
+    int SphericalEstimator::NonMinimalSolver(const std::vector<int>& sample, Eigen::Matrix3d*E) const
     {
-        Eigen::JacobiSVD<Eigen::Matrix3d> svdE(E,Eigen::ComputeFullU|Eigen::ComputeFullV);
-        
-        Eigen::Matrix3d U = svdE.matrixU();
-        Eigen::Matrix3d V = svdE.matrixV();
-        
-        // from theia sfm
-        if (U.determinant() < 0) {
-            U.col(2) *= -1.0;
+        std::vector<Eigen::Matrix3d> Es;
+        MinimalSolver(sample,&Es);
+        if ( Es.empty() ) return 0;
+        double best_score = INFINITY;
+        int best_ind = 0;
+        for ( int i = 0; i < Es.size(); i++ )
+        {
+            double score = 0;
+            for ( int j = 0; j < sample.size(); j++ )
+            {
+                score += EvaluateModelOnPoint(Es[i],sample[j]);
+            }
+            if ( score < best_score ) 
+            {
+                best_score = score;
+                best_ind = i;
+            }
         }
-        
-        if (V.determinant() < 0) {
-            V.col(2) *= -1.0;
-        }
-
-        Eigen::Matrix3d D;
-        D <<
-        0,1,0,
-        -1,0,0,
-        0,0,1;
-
-        Eigen::Matrix3d DT;
-        DT <<
-        0,-1,0,
-        1,0,0,
-        0,0,1;
-
-        Eigen::Matrix3d VT = V.transpose().eval();
-        
-        Eigen::Vector3d tu = U.col(2);
-
-        Eigen::Matrix3d R1 = U*D*VT;
-        Eigen::Matrix3d R2 = U*DT*VT;
-        
-        Eigen::Vector3d t1( R1(0,2), R1(1,2), R1(2,2)-1 );
-        Eigen::Vector3d t2( R2(0,2), R2(1,2), R2(2,2)-1 );
-
-        if ( inward ) { t1 = -t1; t2 = -t2; }
-        
-        Eigen::Vector3d myt1 = t1/t1.norm();
-        Eigen::Vector3d myt2 = t2/t2.norm();
-        
-        Eigen::Vector3d r1 = so3ln(R1);
-        Eigen::Vector3d r2 = so3ln(R2);
-        
-        double score1 = fabs(myt1.dot(tu));
-        double score2 = fabs(myt2.dot(tu));
-
-        if ( score1 > score2 ) { r = r1; t = t1; }
-        else { r = r2; t = t2; }
+        *E = Es[best_ind];
+        return 1;
     }
 
+    void SphericalEstimator::LeastSquares(const std::vector<int>& sample, Eigen::Matrix3d* E) const
+    {
+        Eigen::Vector3d r0(0,0,0);
+        Eigen::Vector3d t0(0,0,-1);
+        Eigen::Vector3d r, t;
+        decompose_spherical_essential_matrix( *E, false, r, t );
+        Eigen::Vector3d r1(r);
+        Eigen::Vector3d t1(0,0,-1);
+        std::vector<Eigen::Vector3d> u;
+        std::vector<Eigen::Vector3d> v;
+        
+        ceres::Problem problem;
+
+        for ( int ind : sample ) 
+        {
+            u.push_back(correspondences[ind].first);
+            v.push_back(correspondences[ind].second);
+        }
+
+        for ( int i = 0; i < sample.size(); i++ )
+        {
+            SampsonError *error = new SampsonError;
+            ceres::CostFunction* cost_function = new ceres::AutoDiffCostFunction<SampsonError, 1, 3, 3, 3, 3, 3, 3>(error);
+            problem.AddResidualBlock(cost_function, NULL,
+                r0.data(), t0.data(),
+                r1.data(), t1.data(),
+                u[i].data(),
+                v[i].data() );
+            problem.SetParameterBlockConstant( u[i].data() );
+            problem.SetParameterBlockConstant( v[i].data() );
+        }
+        problem.SetParameterBlockConstant( r0.data() );
+        problem.SetParameterBlockConstant( t0.data() );
+
+        ceres::Solver::Options options;
+        options.minimizer_type = ceres::TRUST_REGION;
+        options.linear_solver_type = ceres::DENSE_NORMAL_CHOLESKY;
+        options.max_num_iterations = 200;
+        options.max_num_consecutive_invalid_steps = 10;
+        options.minimizer_progress_to_stdout = false;
+        options.num_threads = 16;
+        ceres::Solver::Summary summary;
+        ceres::Solve(options, &problem, &summary);
+        
+        make_spherical_essential_matrix(so3exp(r),false,*E);
+    }
 }
+

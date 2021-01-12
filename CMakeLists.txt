@@ -27,11 +27,15 @@ add_library( sphericalsfm
     include/sphericalsfm/so3.h src/so3.cpp
     include/sphericalsfm/sparse.hpp
     include/sphericalsfm/sfm.h src/sfm.cpp
+    #include/sphericalsfm/triangulation.h src/triangulation.cpp
+    #include/sphericalsfm/viewgraph.h src/viewgraph.cpp
     include/sphericalsfm/sfm_types.h src/sfm_types.cpp
     include/sphericalsfm/estimator.h
     include/sphericalsfm/msac.h
     include/sphericalsfm/preemptive_ransac.h
     include/sphericalsfm/spherical_estimator.h src/spherical_estimator.cpp
+    include/sphericalsfm/similarity_estimator.h src/similarity_estimator.cpp
+    include/sphericalsfm/triangulation_estimator.h src/triangulation_estimator.cpp
     include/sphericalsfm/spherical_fast_estimator.h src/spherical_fast_estimator.cpp
     include/sphericalsfm/plane_estimator.h src/plane_estimator.cpp
     include/sphericalsfm/spherical_utils.h src/spherical_utils.cpp

@@ -400,12 +400,12 @@ namespace stereopanotools {
         load_keyframes( posespath, keyframes );
         std::cout << "loaded " << keyframes.size() << " keyframes\n";
 
-        std::cout << "estimating plane...\n";
+        //std::cout << "estimating plane...\n";
         Eigen::Vector3d up(0,1,0);
-        estimate_plane( keyframes );
+        //estimate_plane( keyframes );
 
-        std::cout << "decomposing rotations...\n";
-        decompose_keyframe_rotations( keyframes );
+        //std::cout << "decomposing rotations...\n";
+        //decompose_keyframe_rotations( keyframes );
 
         std::cout << "computing thetas...\n";
         compute_thetas( keyframes );
@@ -585,7 +585,7 @@ namespace stereopanotools {
               bool success = synthesize_column_flowbased( intrinsics.focal, intrinsics.centerx, intrinsics.centery, theta, phi, alpha, left, right, left_image_float, right_image_float, forward_flow, backward_flow, synth_column );
               if ( !success ) continue;
               found_one_theta = true;
-              std::cout << theta << " " << phi << "\n";
+              //std::cout << theta << " " << phi << "\n";
             
               // store column in output panorama
               int colout = thetanum;
