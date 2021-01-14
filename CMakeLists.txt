@@ -35,6 +35,7 @@ add_library( sphericalsfm
     include/sphericalsfm/preemptive_ransac.h
     include/sphericalsfm/spherical_estimator.h src/spherical_estimator.cpp
     include/sphericalsfm/similarity_estimator.h src/similarity_estimator.cpp
+    include/sphericalsfm/pose_estimator.h src/pose_estimator.cpp
     include/sphericalsfm/triangulation_estimator.h src/triangulation_estimator.cpp
     include/sphericalsfm/spherical_fast_estimator.h src/spherical_fast_estimator.cpp
     include/sphericalsfm/plane_estimator.h src/plane_estimator.cpp

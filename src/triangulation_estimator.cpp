@@ -47,6 +47,7 @@ namespace sphericalsfm {
     {
         const TriangulationObservation &obs(observations[i]);
         const Eigen::Vector3d PX = obs.pose.apply(pt);
+        if ( PX(2) < 0 ) return std::numeric_limits<double>::max();
         const Eigen::Vector2d proj = PX.head(2)/PX(2);
         const Eigen::Vector2d residuals = obs.focal * proj - obs.x;
         return residuals.squaredNorm();

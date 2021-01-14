@@ -474,6 +474,7 @@ namespace sphericalsfm {
             
             Point X;
             int ninliers = ransac.EstimateModel( options, estimator, &X, &stats );
+            if ( ninliers < 3 ) continue;
             
             SetPoint( j, X );
         }
@@ -1050,7 +1051,9 @@ namespace sphericalsfm {
         }
         for ( int j = 0; j < numPoints; j++ )
         {
+            if ( !points.exists(j) ) continue;
             Point X = GetPoint(j);
+            if ( X.norm() == 0 ) continue;
             X = pose.apply(X);
             SetPoint( j, X );
         }
@@ -1067,7 +1070,9 @@ namespace sphericalsfm {
         }
         for ( int j = 0; j < numPoints; j++ )
         {
+            if ( !points.exists(j) ) continue;
             Point X = GetPoint(j);
+            if ( X.norm() == 0 ) continue;
             X *= scale;
             SetPoint( j, X );
         }
@@ -1243,5 +1248,14 @@ namespace sphericalsfm {
 
         std::cout << "average scale over " << GetNumCameras() << " cameras: " << avg_scale << "\n";
         Apply(1./avg_scale);
+        
+        // check if reconstruction has inverted
+        if ( GetPose(0).t(2) > 0 )
+        {
+            std::cout << "inverted! flipping to correct\n";
+            std::cout << "first camera translation was: " << GetPose(0).t.transpose() << "\n";
+            Apply(-1);
+            std::cout << "first camera translation is now: " << GetPose(0).t.transpose() << "\n";
+        }
     }
 }

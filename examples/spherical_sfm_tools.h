@@ -27,6 +27,7 @@ namespace sphericalsfmtools {
 */
     struct Features
     {
+        std::vector<int> tracks;
         std::vector<cv::Point2f> points;
         cv::Mat descs;
         Features() : descs(0,128,CV_32F) { }
@@ -67,9 +68,11 @@ namespace sphericalsfmtools {
     void initialize_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
     void refine_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
 
-    void build_sfm( const std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
+    void build_sfm( std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
                    sphericalsfm::SfM &sfm, bool spherical = true, bool merge = true );
 
     void show_reprojection_error( std::vector<Keyframe> &keyframes, sphericalsfm::SfM &sfm );
-    int make_3d_loop_closures( SfM &sfm, const int min_num_inliers, const int num_frames_begin, const int num_frames_end );
+    //int make_3d_loop_closures( sphericalsfm::SfM &sfm, const int min_num_inliers, const int num_frames_begin, const int num_frames_end );
+    int make_3d_loop_closures( const std::vector<Keyframe> &keyframes, sphericalsfm::SfM &sfm,
+                               const int min_num_inliers, const int num_frames_begin, const int num_frames_end );
 }

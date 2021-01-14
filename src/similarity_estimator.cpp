@@ -15,6 +15,53 @@
 
 namespace sphericalsfm {
     
+    Similarity umeyama( const Eigen::MatrixXd &p, const Eigen::MatrixXd &q )
+    {
+        int N = p.cols();
+        Eigen::Vector3d meanp = Eigen::Vector3d::Zero();
+        Eigen::Vector3d meanq = Eigen::Vector3d::Zero();
+        for ( int i = 0; i < N; i++ )
+        {
+            meanp += p.col(i);
+            meanq += q.col(i);
+        }
+        meanp /= N;
+        meanq /= N;
+        
+        double sigmap = 0;
+        double sigmaq = 0;
+        Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
+        for ( int i = 0; i < N; i++ )
+        {
+            const Eigen::Vector3d myp = p.col(i) - meanp;
+            const Eigen::Vector3d myq = q.col(i) - meanq;
+            sigmap += myp.squaredNorm();
+            sigmaq += myq.squaredNorm();
+            cov += myq*myp.transpose();
+        }
+        sigmap /= N;
+        sigmaq /= N;
+        cov /= N;
+        
+        const Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov,Eigen::ComputeFullU | Eigen::ComputeFullV);
+        const Eigen::Matrix3d U = svd.matrixU();
+        const Eigen::Vector3d D = svd.singularValues();
+        const Eigen::Matrix3d V = svd.matrixU();
+        const double covdet = cov.determinant();
+        const double Udet = U.determinant();
+        const double Vdet = V.determinant();
+        Eigen::Matrix3d S = Eigen::Matrix3d::Identity();
+        if ( covdet < 0 || (covdet == 0 && Udet*Vdet < 0 ) )
+        {
+            S(2,2) = -1;
+        }
+        
+        const Eigen::Matrix3d R = U * S * V.transpose();
+        const double s = 1./sigmap * (D.asDiagonal()*S).trace();
+        const Eigen::Vector3d t = meanq - s*R*meanp;
+        return Similarity(s,R,t);
+    }
+     
     struct SimilarityError
     {
         template <typename T>
@@ -45,7 +92,7 @@ namespace sphericalsfm {
         const RayPair &ray_pair(correspondences[i]);
         const Eigen::Vector3d &p = ray_pair.first;
         const Eigen::Vector3d &q = ray_pair.second;
-        const Eigen::Vector3d pp = sim.s * (sim.R * p + sim.t);
+        const Eigen::Vector3d pp = sim.s * sim.R * p + sim.t;
         
         return (q-pp).squaredNorm();
     }
@@ -76,14 +123,32 @@ namespace sphericalsfm {
             p.col(i) = corr.first;
             q.col(i) = corr.second;
         }
+        
         Eigen::Matrix4d T = Eigen::umeyama(p,q,true);
         
         Eigen::Matrix3d sR = T.block<3,3>(0,0);
-        double s = sR.determinant();
+        double s = std::cbrt(sR.determinant());
         Eigen::Matrix3d R = sR/s;
         Eigen::Vector3d t = T.block<3,1>(0,3);
-        
+
         *sim = Similarity(s,R,t);
+        
+        //*sim = umeyama(p,q);
+
+        /*
+        std::cout << "results:  \n";
+        for ( int i = 0; i < N; i++ )
+        {
+            //const Eigen::Vector3d &q = correspondences[sample[i]].first;
+            //const Eigen::Vector3d &p = correspondences[sample[i]].second;
+            //Eigen::Vector3d Tp = T.block<3,3>(0,0) * p + T.block<3,1>(0,3);
+            //Eigen::Vector3d residuals = q - Tp;
+            //double score = residuals.squaredNorm();
+            double score = EvaluateModelOnPoint(*sim, sample[i]);
+            std::cout << "score: " << score << "\n";
+        }
+        */
+
         
         return 1;
     }

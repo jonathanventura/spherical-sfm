@@ -14,6 +14,16 @@ target_link_libraries( run_spherical_sfm sphericalsfm )
 target_link_libraries( run_spherical_sfm ${OpenCV_LIBS} gflags )
 #target_compile_features( run_spherical_sfm PRIVATE cxx_alias_templates )
 
+add_executable( test_similarity
+    test_similarity.cpp
+)
+target_link_libraries( test_similarity sphericalsfm )
+
+add_executable( test_loop_closure
+    test_loop_closure.cpp
+)
+target_link_libraries( test_loop_closure sphericalsfm )
+
 add_executable( recenter_poses
     recenter_poses.cpp
 )

@@ -54,7 +54,6 @@ int main( int argc, char **argv )
         read_images( FLAGS_video, keyframes );
     }
 
-/*
     std::cout << "detecting loop closures\n";
     int loop_closure_count = make_loop_closures( intrinsics, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend, FLAGS_bestonly );
     if ( FLAGS_bestonly ) std::cout << "only using best loop closure\n";
@@ -63,7 +62,6 @@ int main( int argc, char **argv )
         std::cout << "error: no loop closures found\n";
         exit(1);
     }
-*/
     
     std::cout << "initializing rotations\n";
     std::vector<Eigen::Matrix3d> rotations;
@@ -158,21 +156,23 @@ int main( int argc, char **argv )
     sfm.WritePointsOBJ( FLAGS_output + "/points-pre-spherical-ba.obj" );
     sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras-pre-spherical-ba.obj" );
     
-    std::cout << "running optimization\n";
+    //std::cout << "running optimization\n";
     //sfm.OptimizeViewGraph();
     //sfm.OptimizeViewTriplets();
     //sfm.RetriangulateRobust();
     sfm.Optimize();
     sfm.Retriangulate();
     sfm.Optimize();
-    std::cout << "done.\n";
+    //std::cout << "done.\n";
 
-    sfm.WritePointsOBJ( FLAGS_output + "/points-pre-pose-graph.obj" );
-    sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras-pre-pose-graph.obj" );
+    sfm.WritePointsOBJ( FLAGS_output + "/points-pre-ba.obj" );
+    sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras-pre-ba.obj" );
 
-    std::cout << "detecting loop closures\n";
-    int loop_closure_count = make_3d_loop_closures( sfm, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend );
-    exit(0);
+    //std::cout << "detecting loop closures\n";
+    //int loop_closure_count = make_3d_loop_closures( keyframes, sfm, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend );
+    //exit(0);
+    
+
 
     // unfix translations
     //sfm.SetRotationFixed(1,true);
@@ -182,14 +182,17 @@ int main( int argc, char **argv )
     }
 
     std::cout << "running general optimization\n";
-    sfm.Retriangulate();
+    //sfm.Retriangulate();
     sfm.Optimize();
     sfm.Normalize();
     sfm.Retriangulate();
     sfm.Optimize();
     sfm.Normalize();
     std::cout << "done.\n";
-    
+
+    //sfm.WritePointsOBJ( FLAGS_output + "/points-pre-pose-graph.obj" );
+    //sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras-pre-pose-graph.obj" );
+
     std::vector<int> keyframe_indices(keyframes.size());
     for ( int i = 0; i < keyframes.size(); i++ ) keyframe_indices[i] = keyframes[i].index;
     sfm.WritePoses( FLAGS_output + "/poses.txt", keyframe_indices );
