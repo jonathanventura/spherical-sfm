@@ -53,10 +53,6 @@ int main( int argc, char **argv )
     if ( FLAGS_focal == 0 ) focal = (focalx+focaly)/2;
     
     cv::Mat newCameraMatrix = cv::Mat::eye(3,3,CV_64F);
-    newCameraMatrix.at<double>(0,0) = focal;
-    newCameraMatrix.at<double>(0,2) = centerx;
-    newCameraMatrix.at<double>(1,1) = focal;
-    newCameraMatrix.at<double>(1,2) = centery;
 
     cv::Mat map1, map2;
 
@@ -72,6 +68,14 @@ int main( int argc, char **argv )
         
         if ( video_index == 0 )
         {
+            centerx = image_distorted.size().width/2;
+            centery = image_distorted.size().height/2;
+
+            newCameraMatrix.at<double>(0,0) = focal;
+            newCameraMatrix.at<double>(0,2) = centerx;
+            newCameraMatrix.at<double>(1,1) = focal;
+            newCameraMatrix.at<double>(1,2) = centery;
+
             cv::initUndistortRectifyMap(cameraMatrix, distCoeffs, cv::noArray(), newCameraMatrix, image_distorted.size(), CV_32FC1, map1, map2 );
         }
 
