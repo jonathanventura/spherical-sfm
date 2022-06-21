@@ -91,14 +91,15 @@ RUN mkdir /opencv/build && \
     make install && \
     ldconfig
 
+RUN apt-get update && apt-get install -y git
+
 # Install ceres-solver
 RUN wget http://ceres-solver.org/ceres-solver-1.14.0.tar.gz && \
     tar -zxf ceres-solver-1.14.0.tar.gz && \
     mkdir ceres-bin && \
     cd ceres-bin && \
-    cmake ../ceres-solver-1.14.0 && \
+    cmake ../ceres-solver-1.14.0 -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BENCHMARKS=OFF && \
     make -j3 && \
-    make test && \
     make install
 
 RUN git clone https://github.com/jonathanventura/polynomial.git && \
