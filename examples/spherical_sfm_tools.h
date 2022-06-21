@@ -13,20 +13,9 @@ namespace sphericalsfmtools {
     typedef std::pair<size_t,size_t> Match;
     typedef std::map<size_t,size_t> Matches;
 
-/*
-    struct Feature
-    {
-        float x, y;
-        cv::Mat descriptor;
-        Feature( float _x, float _y, cv::Mat _descriptor ) : x(_x), y(_y) {
-            _descriptor.copyTo(descriptor);
-        }
-        
-    };
-    typedef std::vector<Feature> Features;
-*/
     struct Features
     {
+        std::vector<int> tracks;
         std::vector<cv::Point2f> points;
         cv::Mat descs;
         Features() : descs(0,128,CV_32F) { }
@@ -64,6 +53,8 @@ namespace sphericalsfmtools {
     void initialize_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
     void refine_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
 
-    void build_sfm( const std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
-                   sphericalsfm::SfM &sfm );
+    void build_sfm( std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
+                   sphericalsfm::SfM &sfm, bool spherical = true, bool merge = true );
+
+    void show_reprojection_error( std::vector<Keyframe> &keyframes, sphericalsfm::SfM &sfm );
 }

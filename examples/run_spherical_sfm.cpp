@@ -9,6 +9,7 @@
 
 #include "spherical_sfm_tools.h"
 #include "spherical_sfm_io.h"
+#include <sphericalsfm/so3.h>
 
 using namespace sphericalsfm;
 using namespace sphericalsfmtools;
@@ -51,7 +52,7 @@ int main( int argc, char **argv )
     {
         read_images( FLAGS_video, keyframes );
     }
-    
+
     std::cout << "detecting loop closures\n";
     int loop_closure_count = make_loop_closures( intrinsics, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend, FLAGS_bestonly );
     if ( FLAGS_bestonly ) std::cout << "only using best loop closure\n";
@@ -74,19 +75,39 @@ int main( int argc, char **argv )
 
     std::cout << "building sfm\n";
     SfM sfm( intrinsics );
-    build_sfm( keyframes, image_matches, rotations, sfm );
+    build_sfm( keyframes, image_matches, rotations, sfm, true, true );
     
-    sfm.WritePointsOBJ( FLAGS_output + "/pre-ba-points.obj" );
-    sfm.WriteCameraCentersOBJ( FLAGS_output + "/pre-ba-cameras.obj" );
+    sfm.WritePointsOBJ( FLAGS_output + "/points-pre-spherical-ba.obj" );
+    sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras-pre-spherical-ba.obj" );
     
-    std::cout << "running optimization\n";
     sfm.Optimize();
+    sfm.Retriangulate();
+    sfm.Optimize();
+
+    sfm.WritePointsOBJ( FLAGS_output + "/points-pre-ba.obj" );
+    sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras-pre-ba.obj" );
+
+    // --- general SFM ---
+    // unfix translations
+    for ( int i = 1; i < sfm.GetNumCameras(); i++ )
+    {
+        sfm.SetTranslationFixed(i,false);
+    }
+
+    std::cout << "running general optimization\n";
+    sfm.Optimize();
+    sfm.Normalize();
+    sfm.Retriangulate();
+    sfm.Optimize();
+    sfm.Normalize();
     std::cout << "done.\n";
-    
+
     std::vector<int> keyframe_indices(keyframes.size());
     for ( int i = 0; i < keyframes.size(); i++ ) keyframe_indices[i] = keyframes[i].index;
     sfm.WritePoses( FLAGS_output + "/poses.txt", keyframe_indices );
     sfm.WritePointsOBJ( FLAGS_output + "/points.obj" );
     sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras.obj" );
+        
+    show_reprojection_error( keyframes, sfm );
 }
 

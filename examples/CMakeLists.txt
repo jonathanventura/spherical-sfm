@@ -1,4 +1,3 @@
-
 find_package(gflags REQUIRED)
 
 add_executable( undistort_images

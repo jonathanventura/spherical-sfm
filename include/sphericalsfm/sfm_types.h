@@ -32,7 +32,7 @@ namespace sphericalsfm {
     struct Intrinsics
     {
         double focal, centerx, centery;
-        Intrinsics( double &_focal, double &_centerx, double &_centery ) :
+        Intrinsics( double _focal, double _centerx, double _centery ) :
         focal(_focal), centerx(_centerx), centery(_centery) { }
         Eigen::Matrix3d getK() const {
             Eigen::Matrix3d K = Eigen::Matrix3d::Identity();

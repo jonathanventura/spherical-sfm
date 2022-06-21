@@ -13,10 +13,11 @@
 #include <ceres/solver.h>
 
 namespace sphericalsfm {
+    typedef Eigen::Vector3d Rotation;
+
     class SfM
     {
     protected:
-        friend class ParallelTriangulator;
         Intrinsics intrinsics;
         
         SparseVector<Camera> cameras;          // m cameras
@@ -45,9 +46,8 @@ namespace sphericalsfm {
         ceres::LossFunction *loss_function;
 
         void PreOptimize();
-        void ConfigureSolverOptions( ceres::Solver::Options &options );
+        void ConfigureSolverOptions( ceres::Solver::Options &options, ceres::LinearSolverType linear_solver_type );
         void AddResidual( ceres::Problem &problem, int camera, int point );
-        void AddPoseGraphResidual( ceres::Problem &problem, int i, int j );
         void PostOptimize();
     public:
         SfM( const Intrinsics &_intrinsics );
@@ -57,7 +57,6 @@ namespace sphericalsfm {
         int AddCamera( const Pose &initial_pose, const std::string &path = "" );
         int AddPoint( const Point &initial_position, const cv::Mat &descriptor = cv::Mat() );
         void AddObservation( int camera, int point, const Observation &observation );
-        void AddMeasurement( int i, int j, const Pose &measurement );
 
         void RemoveCamera( int camera );
         void RemovePoint( int point );
@@ -90,6 +89,8 @@ namespace sphericalsfm {
         void WritePoses( const std::string &path, const std::vector<int> &indices );
         void WritePointsOBJ( const std::string &path );
         void WriteCameraCentersOBJ( const std::string &path );
+        
+        void Normalize();
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };

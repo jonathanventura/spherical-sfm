@@ -15,66 +15,11 @@
 #include <sphericalsfm/sfm.h>
 #include <sphericalsfm/so3.h>
 
+#include <RansacLib/ransac.h>
+#include <sphericalsfm/triangulation_estimator.h>
+
 namespace sphericalsfm {
 
-    class ParallelTriangulator : public cv::ParallelLoopBody
-    {
-    public:
-        ParallelTriangulator( SfM &_sfm ) :sfm(_sfm) { }
-        virtual void operator()(const cv::Range &range) const CV_OVERRIDE
-        {
-            for ( int j = range.start; j < range.end; j++ )
-            {
-                if ( !sfm.points.exists(j) ) continue;
-                
-                int firstcam = -1;
-                int lastcam = -1;
-                
-                int nobs = 0;
-                for ( int i = 0; i < sfm.numCameras; i++ )
-                {
-                    if ( !sfm.cameras.exists(i) ) continue;
-                    if ( !( sfm.observations.exists(i,j) ) ) continue;
-                    if ( firstcam == -1 ) firstcam = i;
-                    lastcam = i;
-                    nobs++;
-                }
-
-                sfm.SetPoint( j, Eigen::Vector3d::Zero() );
-                if ( nobs < 3 ) continue;
-
-                Eigen::MatrixXd A( nobs*2, 4 );
-                 
-                int n = 0;
-                for ( int i = 0; i < sfm.numCameras; i++ )
-                {
-                    if ( !sfm.cameras.exists(i) ) continue;
-                    if ( !( sfm.observations.exists(i,j) ) ) continue;
-
-                    Observation vec = sfm.observations(i,j);
-
-                    Eigen::Vector2d point(vec(0)/sfm.intrinsics.focal,vec(1)/sfm.intrinsics.focal);
-                    Eigen::Matrix4d P = sfm.GetPose(i).P;
-                    
-                    A.row(2*n+0) = P.row(2) * point[0] - P.row(0);
-                    A.row(2*n+1) = P.row(2) * point[1] - P.row(1);
-                    n++;
-                }
-
-                Eigen::JacobiSVD<Eigen::MatrixXd> svdA(A,Eigen::ComputeFullV);
-                Eigen::Vector4d Xh = svdA.matrixV().col(3);
-                Eigen::Vector3d X = Xh.head(3)/Xh(3);
-
-                sfm.SetPoint( j, X );
-            }
-        }
-        ParallelTriangulator& operator=(const ParallelTriangulator &) {
-            return *this;
-        }
-    private:
-        SfM &sfm;
-    };
-    
     struct ReprojectionError
     {
         ReprojectionError( double _focal, double _x, double _y )
@@ -111,6 +56,17 @@ namespace sphericalsfm {
         
         double focal, x, y;
     };
+    
+    template <typename T>
+    Eigen::Matrix<T,3,3> skew3(const Eigen::Matrix<T,3,1> &v )
+    {
+        Eigen::Matrix<T,3,3> s;
+        s <<
+        T(0), -v[2], v[1],
+        v[2], T(0), -v[0],
+        -v[1], v[0], T(0);
+        return s;
+    }
     
     SfM::SfM( const Intrinsics &_intrinsics )
     : intrinsics( _intrinsics ),
@@ -177,20 +133,6 @@ namespace sphericalsfm {
         observations(camera,point) = observation;
     }
 
-    void SfM::AddMeasurement( int i, int j, const Pose &measurement )
-    {
-        measurements(i,j) = measurement;
-    }
-
-    bool SfM::GetMeasurement( int i, int j, Pose &measurement )
-    {
-        if ( !measurements.exists(i,j) ) return false;
-
-        measurement = measurements(i,j);
-        
-        return true;
-    }
-
     bool SfM::GetObservation( int camera, int point, Observation &observation )
     {
         if ( !observations.exists(camera,point) ) return false;
@@ -203,49 +145,36 @@ namespace sphericalsfm {
     void SfM::Retriangulate()
     {
         cv::parallel_for_(cv::Range(0,numPoints), [&](const cv::Range &range){
-        //for ( int j = 0; j < numPoints; j++ )
         for ( int j = range.start; j < range.end; j++ )
+        //for ( int j = 0; j < numPoints; j++ )
         {
             if ( !points.exists(j) ) continue;
             
-            int firstcam = -1;
-            int lastcam = -1;
+            std::vector<TriangulationObservation> tri_observations;
             
-            int nobs = 0;
             for ( int i = 0; i < numCameras; i++ )
             {
                 if ( !cameras.exists(i) ) continue;
                 if ( !( observations.exists(i,j) ) ) continue;
-                if ( firstcam == -1 ) firstcam = i;
-                lastcam = i;
-                nobs++;
+                tri_observations.push_back( TriangulationObservation( GetPose(i), observations(i,j), intrinsics.focal )) ;
             }
 
             SetPoint( j, Eigen::Vector3d::Zero() );
-            if ( nobs < 3 ) continue;
+            if ( tri_observations.size() < 3 ) continue;
+            
+            ransac_lib::LORansacOptions options;
+            options.squared_inlier_threshold_ = 4.*(intrinsics.focal*intrinsics.focal);
+            options.final_least_squares_ = true;
+            ransac_lib::RansacStatistics stats;
 
-            Eigen::MatrixXd A( nobs*2, 4 );
-             
-            int n = 0;
-            for ( int i = 0; i < numCameras; i++ )
-            {
-                if ( !cameras.exists(i) ) continue;
-                if ( !( observations.exists(i,j) ) ) continue;
-
-                Observation vec = observations(i,j);
-
-                Eigen::Vector2d point(vec(0)/intrinsics.focal,vec(1)/intrinsics.focal);
-                Eigen::Matrix4d P = GetPose(i).P;
-                
-                A.row(2*n+0) = P.row(2) * point[0] - P.row(0);
-                A.row(2*n+1) = P.row(2) * point[1] - P.row(1);
-                n++;
-            }
-
-            Eigen::JacobiSVD<Eigen::MatrixXd> svdA(A,Eigen::ComputeFullV);
-            Eigen::Vector4d Xh = svdA.matrixV().col(3);
-            Eigen::Vector3d X = Xh.head(3)/Xh(3);
-
+            TriangulationEstimator estimator( tri_observations );
+            
+            ransac_lib::LocallyOptimizedMSAC<Point,std::vector<Point>,TriangulationEstimator> ransac;
+            
+            Point X;
+            int ninliers = ransac.EstimateModel( options, estimator, &X, &stats );
+            if ( ninliers < 3 ) continue;
+            
             SetPoint( j, X );
         }
         });
@@ -253,17 +182,22 @@ namespace sphericalsfm {
 
     void SfM::PreOptimize()
     {
-        loss_function = new ceres::CauchyLoss( 2.0 );
+        loss_function = new ceres::CauchyLoss( 1.0 );
+        //loss_function = NULL;
     }
 
-    void SfM::ConfigureSolverOptions( ceres::Solver::Options &options )
+    void SfM::ConfigureSolverOptions( ceres::Solver::Options &options, ceres::LinearSolverType linear_solver_type )
     {
         options.minimizer_type = ceres::TRUST_REGION;
-        options.linear_solver_type = ceres::SPARSE_SCHUR;
-        options.max_num_iterations = 1000;
+        options.linear_solver_type = linear_solver_type;//ceres::SPARSE_SCHUR;
+        //options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+        //options.linear_solver_type = ceres::DENSE_NORMAL_CHOLESKY;
+        options.max_num_iterations = 2000;
         options.max_num_consecutive_invalid_steps = 100;
         options.minimizer_progress_to_stdout = true;
         options.num_threads = 16;
+        //options.update_state_every_iteration = true;
+        //options.callbacks.push_back(new ScaleCallback(this));
     }
 
     void SfM::AddResidual( ceres::Problem &problem, int camera, int point )
@@ -325,7 +259,7 @@ namespace sphericalsfm {
         std::cout << "\t" << problem.NumResiduals() << " residuals\n";
 
         ceres::Solver::Options options;
-        ConfigureSolverOptions( options );
+        ConfigureSolverOptions( options, ceres::SPARSE_SCHUR );
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
         std::cout << summary.FullReport() << "\n";
@@ -334,6 +268,9 @@ namespace sphericalsfm {
             std::cout << "error: ceres failed.\n";
             exit(1);
         }
+
+        //ScaleCallback callback(this);
+        //callback.rescale();
         
         PostOptimize();
         
@@ -360,7 +297,9 @@ namespace sphericalsfm {
         }
         for ( int j = 0; j < numPoints; j++ )
         {
+            if ( !points.exists(j) ) continue;
             Point X = GetPoint(j);
+            if ( X.norm() == 0 ) continue;
             X = pose.apply(X);
             SetPoint( j, X );
         }
@@ -377,7 +316,9 @@ namespace sphericalsfm {
         }
         for ( int j = 0; j < numPoints; j++ )
         {
+            if ( !points.exists(j) ) continue;
             Point X = GetPoint(j);
+            if ( X.norm() == 0 ) continue;
             X *= scale;
             SetPoint( j, X );
         }
@@ -524,5 +465,43 @@ namespace sphericalsfm {
         }
         
         fclose( f );
+    }
+    
+    void SfM::Normalize()
+    {
+        // calculate centroid 
+        // shift so that centroid is at origin
+        Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+        for ( int i = 0; i < GetNumCameras(); i++ )
+        {
+            Pose pose = GetPose(i);
+            centroid += pose.getCenter();
+        }
+        centroid /= GetNumCameras();
+
+        std::cout << "centroid over " << GetNumCameras() << " cameras: " << centroid.transpose() << "\n";
+        Pose T( -centroid, Eigen::Vector3d::Zero() );
+        Apply(T);
+
+        // divide by average distance from origin
+        double avg_scale = 0;
+        for ( int i = 0; i < GetNumCameras(); i++ )
+        {
+            Pose pose = GetPose(i);
+            avg_scale += pose.getCenter().norm();
+        }
+        avg_scale /= GetNumCameras();
+
+        std::cout << "average scale over " << GetNumCameras() << " cameras: " << avg_scale << "\n";
+        Apply(1./avg_scale);
+        
+        // check if reconstruction has inverted
+        if ( GetPose(0).t(2) > 0 )
+        {
+            std::cout << "inverted! flipping to correct\n";
+            std::cout << "first camera translation was: " << GetPose(0).t.transpose() << "\n";
+            Apply(-1);
+            std::cout << "first camera translation is now: " << GetPose(0).t.transpose() << "\n";
+        }
     }
 }
