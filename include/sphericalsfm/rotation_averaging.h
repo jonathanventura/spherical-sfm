@@ -11,6 +11,6 @@ namespace sphericalsfm {
         RelativeRotation( const int _index0,  const int _index1, const Eigen::Matrix3d &_R ) : index0(_index0), index1(_index1), R(_R) { }
     };
 
-    void optimize_rotations( std::vector<Eigen::Matrix3d> &rotations, const std::vector<RelativeRotation> &relative_rotations );
+    double optimize_rotations( std::vector<Eigen::Matrix3d> &rotations, const std::vector<RelativeRotation> &relative_rotations );
 
 }

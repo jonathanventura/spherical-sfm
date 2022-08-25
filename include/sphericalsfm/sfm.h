@@ -29,6 +29,7 @@ namespace sphericalsfm {
         SparseVector<std::string> paths;       // indexed by camera index
         SparseVector<cv::Mat> descriptors;     // indexed by point index
         
+        bool focalFixed;
         SparseVector<bool> rotationFixed;
         SparseVector<bool> translationFixed;
         SparseVector<bool> pointFixed;
@@ -76,12 +77,15 @@ namespace sphericalsfm {
         void Apply( const Pose &pose );
         void Apply( double scale );
         void Unapply( const Pose &pose );
+    
+        double GetFocal();
         
         Pose GetPose( int camera );
         void SetPose( int camera, const Pose &pose );
         Point GetPoint( int point );
         void SetPoint( int point, const Point &position );
         
+        void SetFocalFixed( bool fixed ) { focalFixed = fixed; }
         void SetRotationFixed( int camera, bool fixed ) { rotationFixed[camera] = fixed; }
         void SetTranslationFixed( int camera, bool fixed ) { translationFixed[camera] = fixed; }
         void SetPointFixed( int point, bool fixed ) { pointFixed[point] = fixed; }

@@ -22,14 +22,15 @@ namespace sphericalsfm {
 
     struct ReprojectionError
     {
-        ReprojectionError( double _focal, double _x, double _y )
-        : focal(_focal), x(_x), y(_y)
+        ReprojectionError( double _x, double _y )
+        : x(_x), y(_y)
         {
             
         }
         
         template <typename T>
-        bool operator()(const T* const camera_t,
+        bool operator()(const T* const focal,
+                        const T* const camera_t,
                         const T* const camera_r,
                         const T* const point,
                         T* residuals) const
@@ -44,8 +45,8 @@ namespace sphericalsfm {
             T yp = p[1] / p[2];
             
             // intrinsics
-            T fxp = T(focal) * xp;
-            T fyp = T(focal) * yp;
+            T fxp = (*focal) * xp;
+            T fyp = (*focal) * yp;
             
             // residuals
             residuals[0] = fxp - T(x);
@@ -54,7 +55,7 @@ namespace sphericalsfm {
             return true;
         }
         
-        double focal, x, y;
+        double x, y;
     };
     
     template <typename T>
@@ -73,7 +74,8 @@ namespace sphericalsfm {
     numCameras( 0 ),
     numPoints( 0 ),
     nextCamera( -1 ),
-    nextPoint( 0 )
+    nextPoint( 0 ),
+    focalFixed( true )
     {
     }
 
@@ -204,10 +206,11 @@ namespace sphericalsfm {
     {
         Observation vec = observations(camera,point);
         
-        ReprojectionError *reproj_error = new ReprojectionError(intrinsics.focal,vec(0),vec(1));
-        ceres::CostFunction* cost_function = new ceres::AutoDiffCostFunction<ReprojectionError, 2, 3, 3, 3>(reproj_error);
-        problem.AddResidualBlock(cost_function, loss_function, GetCameraPtr(camera), GetCameraPtr(camera)+3, GetPointPtr(point) );
+        ReprojectionError *reproj_error = new ReprojectionError(vec(0),vec(1));
+        ceres::CostFunction* cost_function = new ceres::AutoDiffCostFunction<ReprojectionError, 2, 1, 3, 3, 3>(reproj_error);
+        problem.AddResidualBlock(cost_function, loss_function, &intrinsics.focal, GetCameraPtr(camera), GetCameraPtr(camera)+3, GetPointPtr(point) );
 
+        if ( focalFixed ) problem.SetParameterBlockConstant( &intrinsics.focal );
         if ( translationFixed( camera ) ) problem.SetParameterBlockConstant( GetCameraPtr(camera) );
         if ( rotationFixed( camera ) ) problem.SetParameterBlockConstant( GetCameraPtr(camera)+3 );
         if ( pointFixed( point ) ) problem.SetParameterBlockConstant( GetPointPtr(point) );
@@ -344,6 +347,8 @@ namespace sphericalsfm {
             SetPoint( j, X );
         }
     }
+        
+    double SfM::GetFocal() { return intrinsics.focal; }
 
     Pose SfM::GetPose( int camera )
     {

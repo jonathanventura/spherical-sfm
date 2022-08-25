@@ -14,6 +14,14 @@ target_link_libraries( run_spherical_sfm sphericalsfm )
 target_link_libraries( run_spherical_sfm ${OpenCV_LIBS} gflags )
 #target_compile_features( run_spherical_sfm PRIVATE cxx_alias_templates )
 
+add_executable( run_spherical_sfm_uncalib
+    spherical_sfm_tools.h spherical_sfm_tools.cpp
+    spherical_sfm_io.h spherical_sfm_io.cpp
+    run_spherical_sfm_uncalib.cpp
+)
+target_link_libraries( run_spherical_sfm_uncalib sphericalsfm )
+target_link_libraries( run_spherical_sfm_uncalib ${OpenCV_LIBS} gflags )
+
 set( BUILD_STITCHER FALSE CACHE BOOL "Build stereo panorama stitcher app (requires Cuda)" )
 if ( BUILD_STITCHER )
     add_executable( make_stereo_panorama

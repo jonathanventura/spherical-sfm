@@ -51,10 +51,18 @@ namespace sphericalsfmtools {
                             const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end, const bool best_only );
 
     void initialize_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
-    void refine_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
+    double refine_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
 
     void build_sfm( std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
                    sphericalsfm::SfM &sfm, bool spherical = true, bool merge = true );
 
     void show_reprojection_error( std::vector<Keyframe> &keyframes, sphericalsfm::SfM &sfm );
+
+    double find_best_focal_length( int num_cameras,
+                                 std::vector<ImageMatch> &image_matches,
+                                 const double focal_guess,
+                                 const double min_focal,
+                                 const double max_focal,
+                                 const int num_steps,
+                                 std::vector<Eigen::Matrix3d> &rotations );
 }

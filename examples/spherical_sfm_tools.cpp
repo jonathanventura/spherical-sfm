@@ -360,6 +360,7 @@ namespace sphericalsfmtools {
 
             // check for minimum rotation
             if ( best_estimator_r.norm() < min_rot * M_PI / 180. ) {
+                std::cout << "skipping frame\n";
                 video_index++;
                 continue;
             }
@@ -533,7 +534,7 @@ namespace sphericalsfmtools {
         }
     }
 
-    void refine_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations )
+    double refine_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations )
     {
         std::vector<RelativeRotation> relative_rotations;
         for ( int i = 0; i < image_matches.size(); i++ )
@@ -541,7 +542,7 @@ namespace sphericalsfmtools {
             relative_rotations.push_back( RelativeRotation( image_matches[i].index0, image_matches[i].index1, image_matches[i].R ) );
         }
         
-        optimize_rotations( rotations, relative_rotations );
+        return optimize_rotations( rotations, relative_rotations );
     }
 
     void build_sfm( std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
@@ -687,4 +688,67 @@ namespace sphericalsfmtools {
         }
     }
 
+    double find_best_focal_length( int num_cameras,
+                                 std::vector<ImageMatch> &image_matches,
+                                 const double focal_guess,
+                                 const double min_focal,
+                                 const double max_focal,
+                                 const int num_steps,
+                                 std::vector<Eigen::Matrix3d> &rotations )
+    {
+        std::vector<Eigen::Matrix3d> Es(image_matches.size());
+        for ( int i = 0; i < image_matches.size(); i++ )
+        {
+            make_spherical_essential_matrix(image_matches[i].R,false,Es[i]);
+        }
+        
+        std::vector<ImageMatch> image_matches_new(image_matches);
+        
+        double best_cost = INFINITY;
+        double best_focal = focal_guess;
+        
+        FILE *f = fopen("costs.txt","w");
+        double focal_step = (max_focal-min_focal)/(num_steps-1);
+        for ( int step = 0; step < num_steps; step++ )
+        {
+            double focal = min_focal + focal_step * step;
+            
+            Eigen::Vector3d T(focal/focal_guess,focal/focal_guess,1);
+            for ( int i = 0; i < image_matches.size(); i++ )
+            {
+                Eigen::Matrix3d E_new = T.asDiagonal() * Es[i] * T.asDiagonal();
+                Eigen::Vector3d r_new, t_new;
+                decompose_spherical_essential_matrix( E_new, false, r_new, t_new );
+                image_matches_new[i].R = so3exp(r_new);
+            }
+
+            std::vector<Eigen::Matrix3d> my_rotations;
+            initialize_rotations( num_cameras, image_matches_new, my_rotations );
+            double final_cost = refine_rotations( num_cameras, image_matches_new, my_rotations );
+            std::cout << focal << " " << final_cost << "\n";
+            fprintf(f,"%d %lf %lf\n",step,focal,final_cost);
+            if ( final_cost < best_cost )
+            {
+                best_cost = final_cost;
+                best_focal = focal;
+                rotations = my_rotations;
+            }
+            
+            char path[1024];
+            sprintf(path,"centers%03d.obj",step);
+            FILE *objf = fopen(path,"w");
+            for ( int i = 0; i < my_rotations.size(); i++ )
+            {
+                const Eigen::Vector3d t(0,0,-1);
+                const Eigen::Vector3d c = -my_rotations[i].transpose() * t;
+                fprintf(objf,"v %lf %lf %lf\n",c(0),c(1),c(2));
+            }
+            fclose(objf);
+        }
+        fclose(f);
+        
+        return best_focal;
+    }
+
 }
+
