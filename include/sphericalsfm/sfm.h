@@ -89,6 +89,8 @@ namespace sphericalsfm {
         void WritePoses( const std::string &path, const std::vector<int> &indices );
         void WritePointsOBJ( const std::string &path );
         void WriteCameraCentersOBJ( const std::string &path );
+
+        void WriteCOLMAP( const std::string &path, int width, int height );
         
         void Normalize();
     public:

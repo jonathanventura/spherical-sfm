@@ -7,6 +7,7 @@
 #include <Eigen/Jacobi>
 #include <Eigen/SVD>
 #include <Eigen/LU>
+#include <Eigen/Geometry>
 
 #include <iostream>
 
@@ -17,6 +18,12 @@
 
 #include <RansacLib/ransac.h>
 #include <sphericalsfm/triangulation_estimator.h>
+
+#include <bits/stdc++.h>
+#include <iostream>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 
 namespace sphericalsfm {
 
@@ -503,5 +510,80 @@ namespace sphericalsfm {
             Apply(-1);
             std::cout << "first camera translation is now: " << GetPose(0).t.transpose() << "\n";
         }
+    }
+    
+    void SfM::WriteCOLMAP( const std::string &path, int width, int height )
+    {
+        std::string sparse_dir = path + "/sparse";
+        mkdir(sparse_dir.c_str(),0777);
+
+        // write cameras.txt
+        std::string cameras_path = sparse_dir + "/cameras.txt";
+        FILE *camerasf = fopen(cameras_path.c_str(),"w");
+        fprintf(camerasf,"# Camera list with one line of data per camera:\n");
+        fprintf(camerasf,"#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]\n");
+        fprintf(camerasf,"# Number of cameras: 1\n");
+        fprintf(camerasf,"1 SIMPLE_PINHOLE %d %d %lf %lf %lf\n",
+            width, height, intrinsics.focal, intrinsics.centerx, intrinsics.centery );
+        fclose(camerasf);
+
+        // write images.txt
+        std::string images_path = sparse_dir + "/images.txt";
+        FILE *imagesf = fopen(images_path.c_str(),"w");
+        fprintf(imagesf,"# Image list with two lines of data per image:\n");
+        fprintf(imagesf,"#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n");
+        fprintf(imagesf,"#   POINTS2D[] as (X, Y, POINT3D_ID)\n");
+        fprintf(imagesf,"# Number of images: %d, mean observations per image:\n", GetNumCameras() );
+        std::vector< std::vector< std::pair<int,int> > > point_obs(GetNumPoints());
+        for ( int i = 0; i < GetNumCameras(); i++ )
+        {
+            Pose pose = GetPose(i);
+            fprintf(imagesf,"%d ",i+1);
+            Eigen::Quaterniond quat(Eigen::Matrix3d::Identity());
+            if ( pose.r.norm() != 0 )
+            {
+                Eigen::AngleAxisd angleaxis(pose.r.norm(),pose.r/pose.r.norm());
+                quat = Eigen::Quaterniond(angleaxis);
+            }
+            fprintf(imagesf,"%lf %lf %lf %lf ",quat.w(),quat.x(),quat.y(),quat.z());
+            fprintf(imagesf,"%lf %lf %lf ",pose.t(0),pose.t(1),pose.t(2));
+            fprintf(imagesf,"1 ");
+            fprintf(imagesf,"%s\n",paths(i).c_str());
+            int k = 0;
+            for ( int j = 0; j < GetNumPoints(); j++ )
+            {
+                Eigen::Vector3d point = GetPoint(j);
+                if ( point.norm() == 0 ) continue;
+                Observation obs;
+                if ( !GetObservation(i,j,obs) ) continue;
+                fprintf(imagesf,"%lf %lf %d ",obs(0)+intrinsics.centerx,obs(1)+intrinsics.centery,j+1);
+                point_obs[j].push_back(std::make_pair(i+1,k));
+                k++;
+            }
+            fprintf(imagesf,"\n");
+        }
+        fclose(imagesf);
+        
+        // write points3D.txt
+        std::string points_path = sparse_dir + "/points3D.txt";
+        FILE *pointsf = fopen(points_path.c_str(),"w");
+        fprintf(pointsf,"# 3D point list with one line of data per point:\n");
+        fprintf(pointsf,"#   POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)\n");
+        fprintf(pointsf,"# Number of points: %d, mean track length: \n",GetNumPoints());
+        for ( int j = 0; j < GetNumPoints(); j++ )
+        {
+            Eigen::Vector3d point = GetPoint(j);
+            if ( point.norm() == 0 ) continue;
+            fprintf(pointsf,"%d ",j+1);
+            fprintf(pointsf,"%lf %lf %lf ",point(0),point(1),point(2));
+            fprintf(pointsf,"0 0 0 "); // RGB
+            fprintf(pointsf,"0 "); // error
+            for ( int k = 0; k < point_obs[j].size(); k++ )
+            {
+                fprintf(pointsf,"%d %d ",point_obs[j][k].first,point_obs[j][k].second);
+            }
+            fprintf(pointsf,"\n");
+        }
+        fclose(pointsf);
     }
 }

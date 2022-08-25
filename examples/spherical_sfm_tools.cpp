@@ -561,7 +561,9 @@ namespace sphericalsfmtools {
         std::cout << "adding cameras\n";
         for ( int index = 0; index < keyframes.size(); index++ )
         {
-            int camera = sfm.AddCamera( Pose( Eigen::Vector3d(0,0,-1), so3ln(rotations[index]) ) );
+            char path[1024];
+            sprintf(path,"%06d.png",keyframes[index].index+1);
+            int camera = sfm.AddCamera( Pose( Eigen::Vector3d(0,0,-1), so3ln(rotations[index]) ), path );
             sfm.SetRotationFixed( camera, (index==0) );
             sfm.SetTranslationFixed( camera, spherical ? true : (index==0) );
         }
