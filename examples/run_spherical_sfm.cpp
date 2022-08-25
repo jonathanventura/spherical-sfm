@@ -46,6 +46,16 @@ int main( int argc, char **argv )
         std::cout << "tracking features in video: " << FLAGS_video << "\n";
 
         build_feature_tracks( intrinsics, FLAGS_video, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_minrot );
+
+        std::cout << "detecting loop closures\n";
+        int loop_closure_count = make_loop_closures( intrinsics, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend, FLAGS_bestonly );
+        if ( FLAGS_bestonly ) std::cout << "only using best loop closure\n";
+        if ( !FLAGS_noloopclosure && loop_closure_count == 0 ) 
+        {
+            std::cout << "error: no loop closures found\n";
+            exit(1);
+        }
+
         write_feature_tracks( FLAGS_output, keyframes, image_matches ); 
     }
     else
@@ -53,15 +63,6 @@ int main( int argc, char **argv )
         read_images( FLAGS_video, keyframes );
     }
 
-    std::cout << "detecting loop closures\n";
-    int loop_closure_count = make_loop_closures( intrinsics, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend, FLAGS_bestonly );
-    if ( FLAGS_bestonly ) std::cout << "only using best loop closure\n";
-    if ( !FLAGS_noloopclosure && loop_closure_count == 0 ) 
-    {
-        std::cout << "error: no loop closures found\n";
-        exit(1);
-    }
-    
     std::cout << "initializing rotations\n";
     std::vector<Eigen::Matrix3d> rotations;
     initialize_rotations( keyframes.size(), image_matches, rotations );
@@ -107,7 +108,9 @@ int main( int argc, char **argv )
     sfm.WritePoses( FLAGS_output + "/poses.txt", keyframe_indices );
     sfm.WritePointsOBJ( FLAGS_output + "/points.obj" );
     sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras.obj" );
-        
-    show_reprojection_error( keyframes, sfm );
+
+    sfm.WriteCOLMAP( FLAGS_output, keyframes[0].image.cols, keyframes[0].image.rows );
+    
+    //show_reprojection_error( keyframes, sfm );
 }
 

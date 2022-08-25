@@ -94,11 +94,11 @@ RUN mkdir /opencv/build && \
 RUN apt-get update && apt-get install -y git
 
 # Install ceres-solver
-RUN wget http://ceres-solver.org/ceres-solver-1.14.0.tar.gz && \
-    tar -zxf ceres-solver-1.14.0.tar.gz && \
+RUN wget http://ceres-solver.org/ceres-solver-2.1.0.tar.gz && \
+    tar -zxf ceres-solver-2.1.0.tar.gz && \
     mkdir ceres-bin && \
     cd ceres-bin && \
-    cmake ../ceres-solver-1.14.0 -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BENCHMARKS=OFF && \
+    cmake ../ceres-solver-2.1.0 -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BENCHMARKS=OFF && \
     make -j3 && \
     make install
 

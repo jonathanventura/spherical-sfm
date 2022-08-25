@@ -24,7 +24,6 @@ namespace sphericalsfm {
         Point apply( const Point &point ) const;
         Point applyInverse( const Point &point ) const;
         Eigen::Vector3d getCenter() const;
-        
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
