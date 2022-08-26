@@ -64,5 +64,6 @@ namespace sphericalsfmtools {
                                  const double min_focal,
                                  const double max_focal,
                                  const int num_steps,
+                                 const double max_total_rot,
                                  std::vector<Eigen::Matrix3d> &rotations );
 }

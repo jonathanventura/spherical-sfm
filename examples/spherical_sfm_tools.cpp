@@ -415,6 +415,8 @@ namespace sphericalsfmtools {
             for ( int index1 = keyframes.size()-1; index1 >= index0+1; index1-- )
             {
                 if ( ++count1 > num_frames_end ) break;
+
+                if ( index1 == index0 + 1 || index0 == index1 + 1 ) continue;
                             
                 const Features &features1 = keyframes[index1].features;
 
@@ -696,6 +698,7 @@ namespace sphericalsfmtools {
                                  const double min_focal,
                                  const double max_focal,
                                  const int num_steps,
+                                 const double max_total_rot,
                                  std::vector<Eigen::Matrix3d> &rotations )
     {
         std::vector<Eigen::Matrix3d> Es(image_matches.size());
@@ -727,9 +730,17 @@ namespace sphericalsfmtools {
             std::vector<Eigen::Matrix3d> my_rotations;
             initialize_rotations( num_cameras, image_matches_new, my_rotations );
             double final_cost = refine_rotations( num_cameras, image_matches_new, my_rotations );
-            std::cout << focal << " " << final_cost << "\n";
-            fprintf(f,"%d %lf %lf\n",step,focal,final_cost);
-            if ( final_cost < best_cost )
+            
+            // find total rotation
+            double total_rot = 0;
+            for ( int i = 1; i < num_cameras; i++ )
+            {
+                Eigen::Matrix3d relative_rotation = my_rotations[i].transpose() * my_rotations[i-1];
+                total_rot += so3ln(relative_rotation).norm();
+            }
+            std::cout << focal << " " << final_cost << " " << total_rot << "\n";
+            fprintf(f,"%d %lf %lf %lf\n",step,focal,final_cost,total_rot);
+            if ( final_cost < best_cost && total_rot < max_total_rot )
             {
                 best_cost = final_cost;
                 best_focal = focal;
