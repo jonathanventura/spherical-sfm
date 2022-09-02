@@ -16,6 +16,20 @@ Ventura, J., "Structure from Motion on a Sphere", European Conference on Compute
 * [Polynomial](https://github.com/jonathanventura/polynomial)
 * CUDA (for stereo panorama stitcher)
 
+### Building
+
+    mkdir build ;
+    cd build ;
+    cmake .. ;
+    make -j8 ;
+    
+The panorama stitcher app is disabled by default, since it requires CUDA which may not be available on all machines.  To enable it:
+
+    mkdir build ;
+    cd build ;
+    cmake .. -DBUILD_STITCHER=TRUE ;
+    make -j8 ;
+    
 ### Usage
 
 If your images have radial distortion, first undistort them using:

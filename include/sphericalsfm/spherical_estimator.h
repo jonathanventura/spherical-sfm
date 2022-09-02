@@ -8,8 +8,9 @@ namespace sphericalsfm {
     class SphericalEstimator
     {
         const RayPairList &correspondences;
+        const bool inward;
     public:
-        SphericalEstimator(const RayPairList &_correspondences) : correspondences(_correspondences) { }
+        SphericalEstimator(const RayPairList &_correspondences, const bool _inward) : correspondences(_correspondences), inward(_inward) { }
 
         inline int min_sample_size() const { return 3; }
 

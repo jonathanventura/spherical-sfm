@@ -45,16 +45,18 @@ namespace sphericalsfmtools {
 
     void build_feature_tracks( const sphericalsfm::Intrinsics &intrinsics, const std::string &videopath,
                               std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
-                              const double inlier_threshold, const double min_rot );
+                              const double inlier_threshold, const double min_rot,
+                              const bool inward = false );
 
     int make_loop_closures( const sphericalsfm::Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
-                            const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end, const bool best_only );
+                            const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end, const bool best_only,
+                            const bool inward = false );
 
     void initialize_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
     double refine_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
 
     void build_sfm( std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
-                   sphericalsfm::SfM &sfm, bool spherical = true, bool merge = true );
+                   sphericalsfm::SfM &sfm, bool spherical = true, bool merge = true, bool inward = false );
 
     void show_reprojection_error( std::vector<Keyframe> &keyframes, sphericalsfm::SfM &sfm );
 
