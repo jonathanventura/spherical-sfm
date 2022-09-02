@@ -258,10 +258,9 @@ namespace sphericalsfmtools {
 
     void build_feature_tracks( const Intrinsics &intrinsics, const std::string &videopath,
                               std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
-                              const double inlier_threshold, const double min_rot )
+                              const double inlier_threshold, const double min_rot,
+                              const bool inward )
     {
-        bool inward = false;
-        
         Eigen::Matrix3d Kinv = intrinsics.getKinv();
         
         cv::VideoCapture cap(videopath);
@@ -339,7 +338,7 @@ namespace sphericalsfmtools {
 
                 ray_pair_list.push_back( std::make_pair( u, v ) );
             }
-            SphericalEstimator estimator( ray_pair_list );
+            SphericalEstimator estimator( ray_pair_list, inward );
             
             std::cout << "running ransac on " << ray_pair_list.size() << " matches\n";
             ransac_lib::LocallyOptimizedMSAC<Eigen::Matrix3d,std::vector<Eigen::Matrix3d>,SphericalEstimator> ransac;
@@ -355,7 +354,7 @@ namespace sphericalsfmtools {
 
             Eigen::Vector3d best_estimator_t;
             Eigen::Vector3d best_estimator_r;
-            decompose_spherical_essential_matrix( E, false, best_estimator_r, best_estimator_t );
+            decompose_spherical_essential_matrix( E, inward, best_estimator_r, best_estimator_t );
             std::cout << best_estimator_r.transpose() << "\n";
 
             // check for minimum rotation
@@ -386,7 +385,7 @@ namespace sphericalsfmtools {
     }
 
     int make_loop_closures( const Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
-                            const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end, const bool best_only )
+                            const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end, const bool best_only, const bool inward )
     {
         int width = intrinsics.centerx*2;
         int height = intrinsics.centery*2;
@@ -451,7 +450,7 @@ namespace sphericalsfmtools {
                     ray_pair_list.push_back( std::make_pair( u, v ) );
                 }
                 
-                SphericalEstimator estimator(ray_pair_list);
+                SphericalEstimator estimator(ray_pair_list, inward);
                 
                 ransac_lib::LocallyOptimizedMSAC<Eigen::Matrix3d,std::vector<Eigen::Matrix3d>,SphericalEstimator> ransac;
                 ransac_lib::RansacStatistics stats;
@@ -481,7 +480,7 @@ namespace sphericalsfmtools {
                 {
                     Eigen::Vector3d best_estimator_t;
                     Eigen::Vector3d best_estimator_r;
-                    decompose_spherical_essential_matrix( E, false, best_estimator_r, best_estimator_t );
+                    decompose_spherical_essential_matrix( E, inward, best_estimator_r, best_estimator_t );
                     std::cout << best_estimator_r.transpose() << "\n";
 
                     //cv::Mat inliersim;
@@ -545,7 +544,7 @@ namespace sphericalsfmtools {
     }
 
     void build_sfm( std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
-                   sphericalsfm::SfM &sfm, bool spherical, bool merge )
+                   sphericalsfm::SfM &sfm, bool spherical, bool merge, bool inward )
     {
         std::cout << "building tracks\n";
         for ( int i = 0; i < keyframes.size(); i++ )
@@ -563,7 +562,9 @@ namespace sphericalsfmtools {
         {
             char path[1024];
             sprintf(path,"%06d.png",keyframes[index].index+1);
-            int camera = sfm.AddCamera( Pose( Eigen::Vector3d(0,0,-1), so3ln(rotations[index]) ), path );
+            Eigen::Vector3d t(0,0,-1);
+            if ( inward ) t[2] = 1;
+            int camera = sfm.AddCamera( Pose( t, so3ln(rotations[index]) ), path );
             sfm.SetRotationFixed( camera, (index==0) );
             sfm.SetTranslationFixed( camera, spherical ? true : (index==0) );
         }
