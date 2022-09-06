@@ -474,7 +474,7 @@ namespace sphericalsfm {
         fclose( f );
     }
     
-    void SfM::Normalize()
+    void SfM::Normalize( bool inward )
     {
         // calculate centroid 
         // shift so that centroid is at origin
@@ -503,7 +503,7 @@ namespace sphericalsfm {
         Apply(1./avg_scale);
         
         // check if reconstruction has inverted
-        if ( GetPose(0).t(2) > 0 )
+        if ( ( inward && GetPose(0).t(2) < 0 ) || ( !inward && GetPose(0).t(2) > 0 ) )
         {
             std::cout << "inverted! flipping to correct\n";
             std::cout << "first camera translation was: " << GetPose(0).t.transpose() << "\n";

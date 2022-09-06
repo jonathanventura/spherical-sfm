@@ -92,7 +92,7 @@ namespace sphericalsfm {
 
         void WriteCOLMAP( const std::string &path, int width, int height );
         
-        void Normalize();
+        void Normalize( bool inward );
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
