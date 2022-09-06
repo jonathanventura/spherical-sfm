@@ -98,10 +98,10 @@ int main( int argc, char **argv )
 
     std::cout << "running general optimization\n";
     sfm.Optimize();
-    sfm.Normalize();
+    sfm.Normalize( FLAGS_inward );
     sfm.Retriangulate();
     sfm.Optimize();
-    sfm.Normalize();
+    sfm.Normalize( FLAGS_inward );
     std::cout << "done.\n";
 
     std::vector<int> keyframe_indices(keyframes.size());
