@@ -340,6 +340,21 @@ namespace stereopanotools {
                 kf.r = so3ln(kf.R);
             }
         }
+        
+        // compute minimum distance from origin
+        double min_dist = INFINITY;
+        for ( int i = 0; i < keyframes.size(); i++ )
+        {
+            Keyframe &kf = keyframes[i];
+            Eigen::Vector3d c = -kf.R.transpose() * kf.t;
+            std::cout << i << " " << c.norm() << "\n";
+            if ( c.norm() < min_dist ) min_dist = c.norm();
+        }
+        for ( int i = 0; i < keyframes.size(); i++ )
+        {
+            Keyframe &kf = keyframes[i];
+            kf.t *= 1./min_dist;
+        }
     }
 
     cv::Mat convert_to_spherical(const Intrinsics &intrinsics, const cv::Mat &cylindrical )
@@ -454,6 +469,7 @@ namespace stereopanotools {
         {
             while ( video_index < keyframes[i].index )
             {
+                std::cout << video_index << " " << keyframes[i].index << "\n";
                 if ( !cap.read(keyframes[i].image) )
                 {
                     std::cout << "could not read all keyframe images from " << videopath << "\n";
@@ -585,7 +601,7 @@ namespace stereopanotools {
               bool success = synthesize_column_flowbased( intrinsics.focal, intrinsics.centerx, intrinsics.centery, theta, phi, alpha, left, right, left_image_float, right_image_float, forward_flow, backward_flow, synth_column );
               if ( !success ) continue;
               found_one_theta = true;
-              std::cout << theta << " " << phi << "\n";
+              //std::cout << theta << " " << phi << "\n";
             
               // store column in output panorama
               int colout = thetanum;
@@ -593,6 +609,8 @@ namespace stereopanotools {
               colout = (colout+shift)%ntheta;
               if ( colout < 0 ) colout += ntheta;
                 
+              //std::cout << synth_column << "\n";
+              //std::cout << "copying to column " << colout << " of panorama " << phinum << "\n";
               synth_column.copyTo(panoramas[phinum].col(colout));
             }
           }
@@ -615,6 +633,220 @@ namespace stereopanotools {
             cv::vconcat(spherical_panos[nphi-phinum-1],spherical_panos[phinum],overunder);
             cv::imwrite(outputpath + "/overunder" + std::to_string(nphi-phinum-1) + std::to_string(phinum) + ".png", overunder);
             cv::imwrite(outputpath + "/overunder" + std::to_string(nphi-phinum-1) + std::to_string(phinum) + ".jpg", overunder);
+        }
+    }
+
+    void make_circle_views( const Intrinsics &intrinsics, const std::string &videopath, const std::string &outputpath,
+        const int num_views, const bool is_loop )
+    {
+        const int start_theta = 0;
+        const int end_theta = num_views;
+        
+        std::string posespath = outputpath + "/poses.txt";
+        
+        std::vector<Keyframe> keyframes;
+        
+        std::cout << "loading keyframes from " << posespath << "...\n";
+        load_keyframes( posespath, keyframes );
+        std::cout << "loaded " << keyframes.size() << " keyframes\n";
+
+        std::cout << "estimating plane...\n";
+        Eigen::Vector3d up(0,1,0);
+        estimate_plane( keyframes );
+
+        std::cout << "decomposing rotations...\n";
+        decompose_keyframe_rotations( keyframes );
+
+        std::cout << "computing thetas...\n";
+        compute_thetas( keyframes );
+
+        std::cout << "keyframe poses: \n";
+        for ( int i = 0; i < keyframes.size(); i++ ) std::cout << i << "\t" << keyframes[i].t.transpose() << "\t" << so3ln(keyframes[i].R).transpose() << "\n";
+
+        std::cout << "thetas before: \n";
+        for ( int i = 0; i < keyframes.size(); i++ ) std::cout << i << "\t" << keyframes[i].theta*180/M_PI << "\n";
+        
+        // re-order keyframes if necessary to make thetas increase
+        std::cout << "re-ordering...\n";
+        int npos = 0;
+        int nneg = 0;
+        for ( int i = 0; i < 10; i++ ) 
+        {
+            if ( keyframes[1].theta < keyframes[0].theta ) nneg++;
+            else if ( keyframes[0].theta < keyframes[1].theta ) npos++;
+        }
+        bool reverse = ( nneg > npos );
+        
+        // remove end frames that overlap with beginning frames
+        if ( is_loop )
+        {
+            if ( reverse )
+            {
+                while ( keyframes.back().theta < keyframes[0].theta )
+                {
+                    keyframes.pop_back();
+                }
+            } else {
+                while ( keyframes.back().theta > keyframes[0].theta )
+                {
+                    keyframes.pop_back();
+                }
+            }
+        }
+        
+        std::cout << "thetas after: \n";
+        for ( int i = 0; i < keyframes.size(); i++ ) std::cout << i << "\t" << keyframes[i].theta*180/M_PI << "\n";
+        
+        std::cout << "loading images...\n";
+        cv::VideoCapture cap(videopath);
+        int video_index = -1;
+        for ( int i = 0; i < keyframes.size(); i++ )
+        {
+            while ( video_index < keyframes[i].index )
+            {
+                std::cout << video_index << " " << keyframes[i].index << "\n";
+                if ( !cap.read(keyframes[i].image) )
+                {
+                    std::cout << "could not read all keyframe images from " << videopath << "\n";
+                    exit(1);
+                }
+                video_index++;
+            }
+        }
+
+        const int width = keyframes[0].image.cols;
+        const int height = keyframes[0].image.rows;
+        
+        const int nphi = width;
+        //double col = tan(phi);
+        //Eigen::Vector3d synth_x(col,(y-centery)/synth_focal,1);
+        //phi = atan((x-centerx)/focal)
+        const double synth_focal = intrinsics.focal * synth_focal_factor;
+        std::vector<double> phirange(nphi);
+        for ( int x = 0; x < width; x++ )
+        {   
+            phirange[x] = atan((x-intrinsics.centerx)/synth_focal);
+        }
+        
+        const double min_theta = -M_PI;
+        const double max_theta = M_PI;
+        const int ntheta = num_views;
+        std::vector<double> thetarange(ntheta);
+        const double theta_step = (max_theta-min_theta)/(ntheta-1);
+        for ( int i = 0; i < ntheta; i++ ) thetarange[i] = min_theta + i*theta_step;
+        
+        std::cout << "interpolating frames...\n";
+        
+        int last_leftnum = -1;
+        cv::Mat forward_flow;
+        cv::Mat backward_flow;
+        cv::Mat left_image;
+        cv::Mat right_image;
+        cv::Mat left_image_gray;
+        cv::Mat right_image_gray;
+        cv::Mat left_image_float;
+        cv::Mat right_image_float;
+        
+        std::vector<cv::Mat> images(ntheta);
+        for ( int thetanum = 0; thetanum < ntheta; thetanum++ )
+        {
+            images[thetanum] = cv::Mat(height,width,CV_8UC3,cv::Scalar(0,0,0,0));
+        }
+        
+        // iterate through each keyframe pair
+        for ( int kfnum = 0; kfnum < keyframes.size(); kfnum++ )
+        {
+          if ( kfnum % 10 == 0 ) std::cout << kfnum+1 << " / " << keyframes.size() << "\n";
+          if ( !is_loop && kfnum == keyframes.size()-1 ) break;
+
+          int leftnum = kfnum;
+          int rightnum = (kfnum+1)%keyframes.size();
+
+          Keyframe &left = keyframes[leftnum];
+          Keyframe &right = keyframes[rightnum];
+
+          // load images
+          left_image = left.image;
+          cv::cvtColor( left_image, left_image_gray, cv::COLOR_BGR2GRAY );
+          left_image.convertTo(left_image_float,CV_32FC3);
+          right_image = right.image;
+          right_image.convertTo(right_image_float,CV_32FC3);
+          cv::cvtColor( right_image, right_image_gray, cv::COLOR_BGR2GRAY );
+
+          // compute flow
+          _compute_flow( left_image_gray, right_image_gray, forward_flow );
+          _compute_flow( right_image_gray, left_image_gray, backward_flow );
+
+          // get left and right camera centers
+          Eigen::Vector3d C_L = -left.R.transpose() * left.t;
+          Eigen::Vector3d C_R = -right.R.transpose() * right.t;
+
+          bool found_one_theta = false;
+
+          // find theta / phi combinations which fall between these keyframes
+          for ( int thetanum = start_theta; thetanum < end_theta; thetanum++ )
+          {
+            double theta = thetarange[thetanum];
+            Eigen::Vector3d synth_t(0,0,-synth_radius);
+            Eigen::Vector3d synth_r(0,-theta,0);
+            Eigen::Matrix3d synth_R = so3exp(synth_r);
+            
+            // get synthetic camera center
+            Eigen::Vector3d C_D = -synth_R.transpose() * synth_t;
+
+            // project left and right camera centers into synth camera
+            Eigen::Vector3d r_L = C_L - C_D;
+            Eigen::Vector3d r_R = C_R - C_D;
+              
+            // project rays to circle
+            Eigen::Vector3d rs_L = project(r_L,up);
+            Eigen::Vector3d rs_R = project(r_R,up);
+            
+            for ( int phinum = 0; phinum < phirange.size(); phinum++ ) 
+            {
+              double phi = phirange[phinum];
+
+              // get synthetic ray in synth camera coordinate frame
+              Eigen::Vector3d r_D(tan(phi),0,1);
+              // get synthetic ray in world coordinate frame
+              r_D = synth_R.transpose() * (r_D - synth_t);
+              
+              // project synthetic ray to circle
+              Eigen::Vector3d rs_D = project(r_D,up);
+              
+              double angle_LD = signed_angle_between(rs_L,rs_D,up);
+              double angle_RD = signed_angle_between(rs_R,rs_D,up);
+              double angle_LR = signed_angle_between(rs_L,rs_R,up);
+
+              // check that cameras lie on either side of synth ray
+              if ( ! ( angle_LD * angle_RD < 0 ) ) continue;
+              
+              // check that cameras are within front hemisphere
+              const double angle_thresh = M_PI/2;
+              if ( fabs(angle_LD) >= angle_thresh ) continue;
+              if ( fabs(angle_RD) >= angle_thresh ) continue;
+            
+              // calculate alpha
+              double alpha = fabs(angle_LD)/fabs(angle_LR);
+              //std::cout << alpha << "\n";
+            
+              // synthesize column
+              cv::Mat synth_column(height,1,CV_8UC3);
+            
+              bool success = synthesize_column_flowbased( intrinsics.focal, intrinsics.centerx, intrinsics.centery, theta, phi, alpha, left, right, left_image_float, right_image_float, forward_flow, backward_flow, synth_column );
+              if ( !success ) continue;
+              found_one_theta = true;
+              //std::cout << theta << " " << phi << "\n";
+            
+              synth_column.copyTo(images[thetanum].col(phinum));
+            }
+          }
+          
+        }
+        
+        for ( int thetanum = 0; thetanum < ntheta; thetanum++ )
+        {
+            cv::imwrite(outputpath + "/viewsynth" + std::to_string(thetanum) + ".png", images[thetanum]);
         }
     }
 }

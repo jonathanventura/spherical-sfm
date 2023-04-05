@@ -72,7 +72,7 @@ def create_transforms(path,aabb_scale=16,keep_colmap_coords=False,stride=1):
     pbar = tqdm.tqdm(total=len(data))
     for i,row in enumerate(data):
         index = int(row[0])
-        image_path = '%s/%06d.png'%(images_path,index+1)
+        image_path = '%s/%06d.jpg'%(images_path,index+1)
 
         if i == 0:
             image = imread(image_path)
@@ -100,7 +100,7 @@ def create_transforms(path,aabb_scale=16,keep_colmap_coords=False,stride=1):
 
 
         frames.append({
-            'file_path':'images/%06d.png'%(index+1),
+            'file_path':'images/%06d.jpg'%(index+1),
             'sharpness':sharpness(image_path),
             'transform_matrix':c2w,
         })
@@ -135,6 +135,8 @@ def create_transforms(path,aabb_scale=16,keep_colmap_coords=False,stride=1):
     nframes = len(out["frames"])
 
     if keep_colmap_coords:
+        pass
+        """
         flip_mat = np.array([
             [1, 0, 0, 0],
             [0, -1, 0, 0],
@@ -144,6 +146,7 @@ def create_transforms(path,aabb_scale=16,keep_colmap_coords=False,stride=1):
 
         for f in out["frames"]:
             f["transform_matrix"] = np.matmul(f["transform_matrix"], flip_mat) # flip cameras (it just works)
+        """
     else:
         # don't keep colmap coords - reorient the scene to be easier to work with
 
@@ -187,6 +190,16 @@ def create_transforms(path,aabb_scale=16,keep_colmap_coords=False,stride=1):
 
     return out
 
+def create_downsampled_images(path):
+    cmd = 'rm -rf ' + os.path.join(path,'images_4')
+    os.system(cmd)
+    cmd = 'mkdir -p ' + os.path.join(path,'images_4')
+    os.system(cmd)
+    cmd = 'cp -r ' + os.path.join(path,'images/*') + ' ' + os.path.join(path,'images_4/.')
+    os.system(cmd)
+    cmd = 'mogrify -resize 25% ' + os.path.join(path,'images_4/*.jpg')
+    os.system(cmd)
+
 if __name__ == '__main__':
     import argparse
     import json
@@ -207,5 +220,7 @@ if __name__ == '__main__':
     json_path = os.path.join(args.path,'transforms.json')
     with open(json_path, "w") as f:
         json.dump(transforms, f, indent=2)
+    
+    create_downsampled_images(args.path)
  
 

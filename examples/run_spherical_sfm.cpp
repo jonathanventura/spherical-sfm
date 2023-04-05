@@ -24,6 +24,7 @@ DEFINE_int32(numbegin, 30, "Number of frames at beginning of sequence to use for
 DEFINE_int32(numend, 30, "Number of frames at end of sequence to use for loop closure");
 DEFINE_bool(bestonly, false, "Accept only the best loop closure");
 DEFINE_bool(noloopclosure, false, "Allow there to be no loop closures");
+DEFINE_bool(inward, false, "Cameras are inward facing");
 
 int main( int argc, char **argv )
 {
@@ -45,10 +46,10 @@ int main( int argc, char **argv )
     {
         std::cout << "tracking features in video: " << FLAGS_video << "\n";
 
-        build_feature_tracks( intrinsics, FLAGS_video, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_minrot );
+        build_feature_tracks( intrinsics, FLAGS_video, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_minrot, FLAGS_inward );
 
         std::cout << "detecting loop closures\n";
-        int loop_closure_count = make_loop_closures( intrinsics, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend, FLAGS_bestonly );
+        int loop_closure_count = make_loop_closures( intrinsics, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend, FLAGS_bestonly, FLAGS_inward );
         if ( FLAGS_bestonly ) std::cout << "only using best loop closure\n";
         if ( !FLAGS_noloopclosure && loop_closure_count == 0 ) 
         {
@@ -68,7 +69,7 @@ int main( int argc, char **argv )
     initialize_rotations( keyframes.size(), image_matches, rotations );
 
     SfM pre_loop_closure_sfm( intrinsics );
-    build_sfm( keyframes, image_matches, rotations, pre_loop_closure_sfm );
+    build_sfm( keyframes, image_matches, rotations, pre_loop_closure_sfm, true, true, FLAGS_inward );
     pre_loop_closure_sfm.WriteCameraCentersOBJ( FLAGS_output + "/pre-loop-cameras.obj" );
 
     std::cout << "refining rotations\n";
@@ -76,7 +77,7 @@ int main( int argc, char **argv )
 
     std::cout << "building sfm\n";
     SfM sfm( intrinsics );
-    build_sfm( keyframes, image_matches, rotations, sfm, true, true );
+    build_sfm( keyframes, image_matches, rotations, sfm, true, true, FLAGS_inward );
     
     sfm.WritePointsOBJ( FLAGS_output + "/points-pre-spherical-ba.obj" );
     sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras-pre-spherical-ba.obj" );
@@ -97,10 +98,10 @@ int main( int argc, char **argv )
 
     std::cout << "running general optimization\n";
     sfm.Optimize();
-    sfm.Normalize();
+    sfm.Normalize( FLAGS_inward );
     sfm.Retriangulate();
     sfm.Optimize();
-    sfm.Normalize();
+    sfm.Normalize( FLAGS_inward );
     std::cout << "done.\n";
 
     std::vector<int> keyframe_indices(keyframes.size());

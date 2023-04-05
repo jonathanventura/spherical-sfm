@@ -109,10 +109,12 @@ namespace sphericalsfm {
     {
         Eigen::Vector3d r0(0,0,0);
         Eigen::Vector3d t0(0,0,-1);
+        if ( inward ) t0[2] = 1;
         Eigen::Vector3d r, t;
         decompose_spherical_essential_matrix( *E, inward, r, t );
         Eigen::Vector3d r1(r);
         Eigen::Vector3d t1(0,0,-1);
+        if ( inward ) t1[2] = 1;
         std::vector<Eigen::Vector3d> u;
         std::vector<Eigen::Vector3d> v;
         
@@ -149,7 +151,7 @@ namespace sphericalsfm {
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
         
-        make_spherical_essential_matrix(so3exp(r),inward,*E);
+        make_spherical_essential_matrix(so3exp(r1),inward,*E);
     }
 }
 

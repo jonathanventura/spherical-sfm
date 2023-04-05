@@ -96,7 +96,8 @@ namespace sphericalsfm {
 
         void WriteCOLMAP( const std::string &path, int width, int height );
         
-        void Normalize();
+        void Normalize( bool inward );
+        void FilterObservations( double thresh );
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
