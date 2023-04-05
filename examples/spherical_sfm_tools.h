@@ -6,6 +6,7 @@
 #include <string>
 
 #include <opencv2/core.hpp>
+#include <opencv2/xfeatures2d.hpp>
 
 #include <sphericalsfm/sfm.h>
 
@@ -43,6 +44,26 @@ namespace sphericalsfmtools {
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
+    class DetectorTracker
+    {
+    protected:
+        double min_dist; // minimum distance between existing points and detecting points
+        const int xradius; // horizontal tracking radius
+        const int yradius; // vertical tracking radius
+        cv::Ptr<cv::xfeatures2d::SIFT> sift;
+    public:
+        DetectorTracker( double _min_dist=0, double _xradius=0, double _yradius=0 );
+        
+        void detect( const cv::Mat &image, Features &features );
+        void track( cv::Mat &image0, cv::Mat &image1,
+                    const Features &features0, Features &features1,
+                    Matches &m01 );
+    };
+
+    void match( const Features &features0, const Features &features1, Matches &m01, double ratio = 0.75 );
+    void detect_features( const std::string &videopath, std::vector<Keyframe> &keyframes );
+    int match_exhaustive( const sphericalsfm::Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
+                            const double inlier_threshold, const int min_num_inliers, const bool inward );
     void build_feature_tracks( const sphericalsfm::Intrinsics &intrinsics, const std::string &videopath,
                               std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
                               const double inlier_threshold, const double min_rot,
@@ -56,16 +77,18 @@ namespace sphericalsfmtools {
     double refine_rotations( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations );
 
     void build_sfm( std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
-                   sphericalsfm::SfM &sfm, bool spherical = true, bool merge = true, bool inward = false );
+                   sphericalsfm::SfM &sfm, bool spherical = true, bool merge = true, bool inward = false, int fix_camera = 0 );
 
     void show_reprojection_error( std::vector<Keyframe> &keyframes, sphericalsfm::SfM &sfm );
 
-    double find_best_focal_length( int num_cameras,
+    bool find_best_focal_length( int num_cameras,
                                  std::vector<ImageMatch> &image_matches,
+                                 const bool inward,
                                  const double focal_guess,
                                  const double min_focal,
                                  const double max_focal,
                                  const int num_steps,
                                  const double max_total_rot,
-                                 std::vector<Eigen::Matrix3d> &rotations );
+                                 std::vector<Eigen::Matrix3d> &rotations,
+                                 double &best_focal );
 }

@@ -25,6 +25,7 @@ DEFINE_int32(numbegin, 30, "Number of frames at beginning of sequence to use for
 DEFINE_int32(numend, 30, "Number of frames at end of sequence to use for loop closure");
 DEFINE_bool(bestonly, false, "Accept only the best loop closure");
 DEFINE_bool(noloopclosure, false, "Allow there to be no loop closures");
+DEFINE_bool(inward, false, "Cameras are inward facing");
 
 int main( int argc, char **argv )
 {
@@ -59,10 +60,16 @@ int main( int argc, char **argv )
     {
         std::cout << "tracking features in video: " << FLAGS_video << "\n";
 
-        build_feature_tracks( intrinsics_guess, FLAGS_video, keyframes, image_matches, FLAGS_inlierthresh, min_rot );
-
+        detect_features( FLAGS_video, keyframes );
         std::cout << "detecting loop closures\n";
-        int loop_closure_count = make_loop_closures( intrinsics_guess, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend, FLAGS_bestonly );
+        int loop_closure_count = match_exhaustive( intrinsics_guess, keyframes, image_matches,
+                            FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_inward );
+        //exit(0);
+        //build_feature_tracks( intrinsics_guess, FLAGS_video, keyframes, image_matches, FLAGS_inlierthresh, min_rot, FLAGS_inward );
+
+        //std::cout << "detecting loop closures\n";
+        //int loop_closure_count = make_loop_closures( intrinsics_guess, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_numbegin, FLAGS_numend, FLAGS_bestonly, FLAGS_inward );
+        //int loop_closure_count = make_loop_closures( intrinsics_guess, keyframes, image_matches, FLAGS_inlierthresh, FLAGS_mininliers, keyframes.size(), keyframes.size(), FLAGS_bestonly, FLAGS_inward );
         if ( FLAGS_bestonly ) std::cout << "only using best loop closure\n";
         if ( !FLAGS_noloopclosure && loop_closure_count == 0 ) 
         {
@@ -84,15 +91,22 @@ int main( int argc, char **argv )
     //    record final error
     // pick focal length with best final error
     const double min_focal = std::min(width,height)/4;
-    const double max_focal = std::min(width,height)*2;
+    const double max_focal = std::min(width,height)*16;
     const int num_steps = 128;
     const double max_total_rot = 450*M_PI/180.;
     std::vector<Eigen::Matrix3d> rotations;
-    double focal_new = find_best_focal_length( keyframes.size(), 
-            image_matches, focal_guess,
+    double focal_new;
+    bool success = find_best_focal_length( keyframes.size(), 
+            image_matches, FLAGS_inward, focal_guess,
             min_focal, max_focal, num_steps,
             max_total_rot,
-            rotations );
+            rotations,
+            focal_new );
+    if ( !success )
+    {
+        std::cout << "ERROR: could not find any acceptable focal length\n";
+        exit(1);
+    }
     std::cout << " best focal: " << focal_new << "\n";
     Intrinsics intrinsics(focal_new,centerx,centery);
     
@@ -110,7 +124,7 @@ int main( int argc, char **argv )
 
     std::cout << "building sfm\n";
     SfM sfm( intrinsics );
-    build_sfm( keyframes, image_matches, rotations, sfm, true, true );
+    build_sfm( keyframes, image_matches, rotations, sfm, true, true, FLAGS_inward );
     sfm.SetFocalFixed(false);
     
     sfm.WritePointsOBJ( FLAGS_output + "/points-pre-spherical-ba.obj" );
@@ -135,10 +149,10 @@ int main( int argc, char **argv )
 
     std::cout << "running general optimization\n";
     sfm.Optimize();
-    sfm.Normalize();
+    sfm.Normalize( FLAGS_inward );
     sfm.Retriangulate();
     sfm.Optimize();
-    sfm.Normalize();
+    sfm.Normalize( FLAGS_inward );
     std::cout << "done.\n";
 
     std::vector<int> keyframe_indices(keyframes.size());
@@ -151,5 +165,10 @@ int main( int argc, char **argv )
         
     //show_reprojection_error( keyframes, sfm );
     std::cout << "focal after general BA: " << sfm.GetFocal() << "\n";
+
+    std::string calib_path = FLAGS_output + "/calib.txt";
+    FILE *calibf = fopen(calib_path.c_str(), "w");
+    fprintf(calibf, "%0.15f %0.15f %0.15f\n", sfm.GetFocal(), centerx, centery );
+    fclose(calibf);
 }
 

@@ -154,73 +154,63 @@ namespace sphericalsfmtools {
         return mout;
     }
 
-    class DetectorTracker
-    {
-    protected:
-        double min_dist; // minimum distance between existing points and detecting points
-        const int xradius; // horizontal tracking radius
-        const int yradius; // vertical tracking radius
-        cv::Ptr<cv::xfeatures2d::SIFT> sift;
-    public:
-        DetectorTracker( double _min_dist=0, double _xradius=0, double _yradius=0 ) :
+    DetectorTracker::DetectorTracker( double _min_dist, double _xradius, double _yradius ) :
         min_dist(_min_dist), xradius(_xradius), yradius(_yradius), sift(cv::xfeatures2d::SIFT::create(20000)) { }
         
-        void detect( const cv::Mat &image, Features &features )
+    void DetectorTracker::detect( const cv::Mat &image, Features &features )
+    {
+        assert( image.type() == CV_8UC1 );
+        
+        std::vector<cv::KeyPoint> keypoints;
+        cv::Mat descs;
+
+        int ntokeep = std::max(0,4000 - (int)features.points.size());
+        if ( ntokeep == 0 ) return;
+        if ( features.empty() )
         {
-            assert( image.type() == CV_8UC1 );
-            
-            std::vector<cv::KeyPoint> keypoints;
-            cv::Mat descs;
-
-            int ntokeep = std::max(0,4000 - (int)features.points.size());
-            if ( ntokeep == 0 ) return;
-            if ( features.empty() )
-            {
-                sift->detect( image, keypoints );
-            } else {
-                cv::Mat mask(image.size(),CV_8UC1);
-                mask = cv::Scalar(255);
-                for ( int i = 0; i < features.points.size(); i++ ) cv::circle(mask,features.points[i],min_dist,cv::Scalar(0),-1);
-                sift->detect( image, keypoints, mask );
-            }
-            
-            adaptiveNonMaximalSuppresion(keypoints, ntokeep);
-            std::cout << "after anms, we have " << keypoints.size() << " keypoints\n";
-            sift->compute( image, keypoints, descs );
-             
-            for  ( int i = 0; i < keypoints.size(); i++ )
-            {
-                features.points.push_back( keypoints[i].pt );
-                features.descs.push_back( descs.row(i) );
-            }
+            sift->detect( image, keypoints );
+        } else {
+            cv::Mat mask(image.size(),CV_8UC1);
+            mask = cv::Scalar(255);
+            for ( int i = 0; i < features.points.size(); i++ ) cv::circle(mask,features.points[i],min_dist,cv::Scalar(0),-1);
+            sift->detect( image, keypoints, mask );
         }
-
-        void track( cv::Mat &image0, cv::Mat &image1,
-                    const Features &features0, Features &features1,
-                    Matches &m01 )
+        
+        adaptiveNonMaximalSuppresion(keypoints, ntokeep);
+        //std::cout << "after anms, we have " << keypoints.size() << " keypoints\n";
+        sift->compute( image, keypoints, descs );
+         
+        for  ( int i = 0; i < keypoints.size(); i++ )
         {
-            const size_t npts0 = features0.size();
-            
-            const std::vector<cv::Point2f> &prevPts(features0.points);
-            std::vector<cv::Point2f> nextPts;
-            std::vector<uchar> status;
-            std::vector<float> err;
-            
-            cv::calcOpticalFlowPyrLK(image0, image1, prevPts, nextPts, status, err, cv::Size(xradius*2+1,yradius*2+1));
-            
-            for ( int i = 0; i < npts0; i++ )
-            {
-                if ( status[i] == 0 ) continue;
-                
-                features1.points.push_back( nextPts[i] );
-                features1.descs.push_back( features0.descs.row(i) );
-                m01[i] = features1.size()-1;
-            }
+            features.points.push_back( keypoints[i].pt );
+            features.descs.push_back( descs.row(i) );
         }
+    }
 
-    };
+    void DetectorTracker::track( cv::Mat &image0, cv::Mat &image1,
+                const Features &features0, Features &features1,
+                Matches &m01 )
+    {
+        const size_t npts0 = features0.size();
+        
+        const std::vector<cv::Point2f> &prevPts(features0.points);
+        std::vector<cv::Point2f> nextPts;
+        std::vector<uchar> status;
+        std::vector<float> err;
+        
+        cv::calcOpticalFlowPyrLK(image0, image1, prevPts, nextPts, status, err, cv::Size(xradius*2+1,yradius*2+1));
+        
+        for ( int i = 0; i < npts0; i++ )
+        {
+            if ( status[i] == 0 ) continue;
+            
+            features1.points.push_back( nextPts[i] );
+            features1.descs.push_back( features0.descs.row(i) );
+            m01[i] = features1.size()-1;
+        }
+    }
 
-    void match( const Features &features0, const Features &features1, Matches &m01, double ratio = 0.75 )
+    void match( const Features &features0, const Features &features1, Matches &m01, double ratio )
     {
         cv::BFMatcher matcher;
 
@@ -292,7 +282,10 @@ namespace sphericalsfmtools {
         
         ransac_lib::LORansacOptions options;
         options.squared_inlier_threshold_ = inlier_threshold*inlier_threshold*Kinv(0)*Kinv(0);
-        options.final_least_squares_ = true;
+        //options.final_least_squares_ = true;
+        options.num_lo_steps_ = 0;
+        options.num_lsq_iterations_ = 0;
+        options.final_least_squares_ = false;
         ransac_lib::RansacStatistics stats;
 
         int kf_index = 1;
@@ -311,9 +304,11 @@ namespace sphericalsfmtools {
             match( features0, features1, m01 );
             std::cout << "tracked " << features1.size() << " features in image " << video_index << "\n";
                 
-            //cv::Mat matchesim;
-            //drawmatches( image0, image1, features0, features1, m01, matchesim );
-            //cv::imwrite( "matches" + std::to_string(video_index) + ".png", matchesim );
+            /*
+            cv::Mat matchesim;
+            drawmatches( image0, image1, features0, features1, m01, matchesim );
+            cv::imwrite( "matches" + std::to_string(video_index) + ".png", matchesim );
+            */
 
             std::vector<bool> inliers;
             int ninliers;
@@ -370,6 +365,11 @@ namespace sphericalsfmtools {
             {
                 if ( inliers[i++] ) m01inliers[it->first] = it->second;
             }
+            /*
+            cv::Mat inliersim;
+            drawmatches( image0, image1, features0, features1, m01inliers, inliersim );
+            cv::imwrite( "inliers" + std::to_string(video_index) + ".png", inliersim );
+            */
             
             image1.copyTo(image0);
             features0 = features1;
@@ -385,6 +385,149 @@ namespace sphericalsfmtools {
         }
     }
 
+    void detect_features( const std::string &videopath, std::vector<Keyframe> &keyframes )
+    {
+        cv::VideoCapture cap(videopath);
+        
+        int i = 0;
+        cv::Mat image_in, image;
+        while ( cap.read(image_in) )
+        {
+            if ( image_in.channels() == 3 ) cv::cvtColor( image_in, image, cv::COLOR_BGR2GRAY );
+            else image = image_in;
+            Features features;
+            keyframes.push_back(Keyframe(i,features));
+            image.copyTo(keyframes[keyframes.size()-1].image);
+            i++;
+        }
+    
+        if ( keyframes.empty() )
+        {
+            std::cout << "error: could not read single frame from " << videopath << "\n";
+            exit(1);
+        }
+
+#pragma omp parallel for
+        for ( int i = 0; i < keyframes.size(); i++ )
+        {
+            Keyframe &keyframe = keyframes[i];
+            DetectorTracker detector;
+            detector.detect( keyframe.image, keyframe.features );
+            std::cout << "image " << i << " has " << keyframe.features.size() << " features\n";
+        }
+    }
+
+    int match_exhaustive( const Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
+                            const double inlier_threshold, const int min_num_inliers, const bool inward )
+    {
+        Eigen::Matrix3d Kinv = intrinsics.getKinv();
+        
+        ransac_lib::LORansacOptions options;
+        options.squared_inlier_threshold_ = inlier_threshold*inlier_threshold*Kinv(0)*Kinv(0);
+        options.num_lo_steps_ = 0;
+        options.num_lsq_iterations_ = 0;
+        options.final_least_squares_ = true;
+
+        std::vector<ImageMatch> my_image_matches; 
+        for ( int index0 = 0; index0 < keyframes.size(); index0++ )
+        {
+            for ( int index1 = index0+1; index1 < keyframes.size(); index1++ )
+            {
+                Matches m;
+                Eigen::Matrix3d R;
+                ImageMatch image_match(index0, index1, m, R);
+                my_image_matches.push_back(image_match);
+            }
+        }
+
+#pragma omp parallel for
+        for ( int i = 0; i < my_image_matches.size(); i++ ) 
+        {
+            ImageMatch &image_match = my_image_matches[i];
+            int index0 = image_match.index0;
+            int index1 = image_match.index1;
+            const Features &features0 = keyframes[index0].features;
+            const Features &features1 = keyframes[index1].features;
+
+            Matches m01;
+                
+            match( features0, features1, m01 );
+            if ( m01.size() < min_num_inliers ) continue;
+
+            std::vector<bool> inliers;
+            int ninliers;
+
+            // find inlier matches using relative pose
+            RayPairList ray_pair_list;
+            ray_pair_list.reserve( m01.size() );
+            for ( Matches::const_iterator it = m01.begin(); it != m01.end(); it++ )
+            {
+                cv::Point2f pt0 = features0.points[it->first];
+                cv::Point2f pt1 = features1.points[it->second];
+
+                Eigen::Vector3d loc0 = Eigen::Vector3d( pt0.x, pt0.y, 1 );
+                Eigen::Vector3d loc1 = Eigen::Vector3d( pt1.x, pt1.y, 1 );
+                
+                loc0 = Kinv * loc0;
+                loc1 = Kinv * loc1;
+                
+                Ray u;
+                u.head(3) = loc0;
+                Ray v;
+                v.head(3) = loc1;
+
+                ray_pair_list.push_back( std::make_pair( u, v ) );
+            }
+                
+            SphericalEstimator estimator(ray_pair_list, inward);
+            
+            ransac_lib::LocallyOptimizedMSAC<Eigen::Matrix3d,std::vector<Eigen::Matrix3d>,SphericalEstimator> ransac;
+            ransac_lib::RansacStatistics stats;
+            Eigen::Matrix3d E;
+            if ( m01.empty() )
+            {
+                ninliers = 0;
+            } else {
+                ninliers = ransac.EstimateModel( options, estimator, &E, &stats );
+                inliers.resize(ray_pair_list.size());
+                for ( int i = 0; i < ray_pair_list.size(); i++ )
+                {
+                    inliers[i] = ( estimator.EvaluateModelOnPoint(E,i) < options.squared_inlier_threshold_ );
+                }
+            }
+            fprintf( stdout, "%d %d: %lu matches and %d inliers (%0.2f%%)\n",
+                     keyframes[index0].index, keyframes[index1].index, m01.size(), ninliers, (double)ninliers/(double)m01.size()*100 );
+
+            Matches m01inliers;
+            size_t j = 0;
+            for ( Matches::const_iterator it = m01.begin(); it != m01.end(); it++ )
+            {
+                if ( inliers[j++] ) m01inliers[it->first] = it->second;
+            }
+
+            if ( ninliers > min_num_inliers )
+            {
+                Eigen::Vector3d best_estimator_t;
+                Eigen::Vector3d best_estimator_r;
+                decompose_spherical_essential_matrix( E, inward, best_estimator_r, best_estimator_t );
+                //std::cout << best_estimator_r.transpose() << "\n";
+
+                image_match.matches = m01inliers;
+                image_match.R = so3exp(best_estimator_r);
+            }
+        }
+        
+        int loop_closure_count = 0;
+        for ( int i = 0; i < my_image_matches.size(); i++ )
+        {
+            if ( my_image_matches[i].matches.empty() ) continue;
+            if ( my_image_matches[i].index0 + 1 != my_image_matches[i].index1 ) loop_closure_count++;
+            image_matches.push_back( my_image_matches[i] );
+        }
+        
+        return loop_closure_count;
+    }
+
     int make_loop_closures( const Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
                             const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end, const bool best_only, const bool inward )
     {
@@ -395,7 +538,10 @@ namespace sphericalsfmtools {
         
         ransac_lib::LORansacOptions options;
         options.squared_inlier_threshold_ = inlier_threshold*inlier_threshold*Kinv(0)*Kinv(0);
-        options.final_least_squares_ = true;
+        //options.final_least_squares_ = true;
+        options.num_lo_steps_ = 0;
+        options.num_lsq_iterations_ = 0;
+        options.final_least_squares_ = false;
         ransac_lib::RansacStatistics stats;
 
         ImageMatch best_image_match( -1, -1, Matches(), Eigen::Matrix3d::Identity() );
@@ -424,9 +570,11 @@ namespace sphericalsfmtools {
                 match( features0, features1, m01 );
                 if ( m01.size() < min_num_inliers ) continue;
 
-                //cv::Mat matchesim;
-                //drawmatches( keyframes[index0].image, keyframes[index1].image, features0, features1, m01, matchesim );
-                //cv::imwrite( "matches" + std::to_string(keyframes[index0].index) + "-" + std::to_string(keyframes[index1].index) + ".png", matchesim );
+                /*
+                cv::Mat matchesim;
+                drawmatches( keyframes[index0].image, keyframes[index1].image, features0, features1, m01, matchesim );
+                cv::imwrite( "matches" + std::to_string(keyframes[index0].index) + "-" + std::to_string(keyframes[index1].index) + ".png", matchesim );
+                */
 
                 std::vector<bool> inliers;
                 int ninliers;
@@ -486,9 +634,11 @@ namespace sphericalsfmtools {
                     decompose_spherical_essential_matrix( E, inward, best_estimator_r, best_estimator_t );
                     std::cout << best_estimator_r.transpose() << "\n";
 
-                    //cv::Mat inliersim;
-                    //drawmatches( keyframes[index0].image, keyframes[index1].image, features0, features1, m01inliers, inliersim );
-                    //cv::imwrite( "inliers_before" + std::to_string(keyframes[index0].index) + "-" + std::to_string(keyframes[index1].index) + ".png", inliersim );
+                    /*
+                    cv::Mat inliersim;
+                    drawmatches( keyframes[index0].image, keyframes[index1].image, features0, features1, m01inliers, inliersim );
+                    cv::imwrite( "loop" + std::to_string(keyframes[index0].index) + "-" + std::to_string(keyframes[index1].index) + ".png", inliersim );
+                    */
 
                     //m01inliers = filter_matches(features0,features1,m01inliers,thresh);
 
@@ -547,7 +697,7 @@ namespace sphericalsfmtools {
     }
 
     void build_sfm( std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches, const std::vector<Eigen::Matrix3d> &rotations,
-                   sphericalsfm::SfM &sfm, bool spherical, bool merge, bool inward )
+                   sphericalsfm::SfM &sfm, bool spherical, bool merge, bool inward, int fix_camera )
     {
         std::cout << "building tracks\n";
         for ( int i = 0; i < keyframes.size(); i++ )
@@ -568,8 +718,8 @@ namespace sphericalsfmtools {
             Eigen::Vector3d t(0,0,-1);
             if ( inward ) t[2] = 1;
             int camera = sfm.AddCamera( Pose( t, so3ln(rotations[index]) ), path );
-            sfm.SetRotationFixed( camera, (index==0) );
-            sfm.SetTranslationFixed( camera, spherical ? true : (index==0) );
+            sfm.SetRotationFixed( camera, (index==fix_camera) );
+            sfm.SetTranslationFixed( camera, spherical ? true : (index==fix_camera) );
         }
 
         std::cout << "adding tracks\n";
@@ -693,25 +843,29 @@ namespace sphericalsfmtools {
         }
     }
 
-    double find_best_focal_length( int num_cameras,
+    bool find_best_focal_length( int num_cameras,
                                  std::vector<ImageMatch> &image_matches,
+                                 const bool inward,
                                  const double focal_guess,
                                  const double min_focal,
                                  const double max_focal,
                                  const int num_steps,
                                  const double max_total_rot,
-                                 std::vector<Eigen::Matrix3d> &rotations )
+                                 std::vector<Eigen::Matrix3d> &rotations,
+                                 double &best_focal )
     {
         std::vector<Eigen::Matrix3d> Es(image_matches.size());
         for ( int i = 0; i < image_matches.size(); i++ )
         {
-            make_spherical_essential_matrix(image_matches[i].R,false,Es[i]);
+            make_spherical_essential_matrix(image_matches[i].R,inward,Es[i]);
+            std::cout << i << "\n" << Es[i] << "\n\n";
         }
         
         std::vector<ImageMatch> image_matches_new(image_matches);
         
+        bool found_one = false;
         double best_cost = INFINITY;
-        double best_focal = focal_guess;
+        best_focal = focal_guess;
         
         FILE *f = fopen("costs.txt","w");
         double focal_step = (max_focal-min_focal)/(num_steps-1);
@@ -724,7 +878,7 @@ namespace sphericalsfmtools {
             {
                 Eigen::Matrix3d E_new = T.asDiagonal() * Es[i] * T.asDiagonal();
                 Eigen::Vector3d r_new, t_new;
-                decompose_spherical_essential_matrix( E_new, false, r_new, t_new );
+                decompose_spherical_essential_matrix( E_new, inward, r_new, t_new );
                 image_matches_new[i].R = so3exp(r_new);
             }
 
@@ -746,6 +900,7 @@ namespace sphericalsfmtools {
                 best_cost = final_cost;
                 best_focal = focal;
                 rotations = my_rotations;
+                found_one = true;
             }
             
             char path[1024];
@@ -761,7 +916,7 @@ namespace sphericalsfmtools {
         }
         fclose(f);
         
-        return best_focal;
+        return found_one;
     }
 
 }

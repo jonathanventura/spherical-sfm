@@ -355,7 +355,7 @@ namespace sphericalsfm {
         ceres::Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
         
-        make_spherical_essential_matrix(so3exp(r),inward,*E);
+        make_spherical_essential_matrix(so3exp(r1),inward,*E);
     }
 }
 

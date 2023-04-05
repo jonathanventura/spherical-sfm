@@ -291,6 +291,50 @@ namespace sphericalsfm {
     {
         
     }
+
+    void SfM::FilterObservations( double thresh )
+    {
+        int nremoved = 0;
+        for ( int j = 0; j < numPoints; j++ )
+        {
+            if ( !points.exists(j) ) continue;
+            if ( points(j).norm() == 0 ) continue;
+            
+            int nobs = 0;
+            for ( int i = 0; i < numCameras; i++ )
+            {
+                if ( !cameras.exists(i) ) continue;
+                if ( !( observations.exists(i,j) ) ) continue;
+                
+                nobs++;
+            }
+            
+            if ( nobs < 3 ) continue;
+            for ( int i = 0; i < numCameras; i++ )
+            {
+                if ( !cameras.exists(i) ) continue;
+                if ( !( observations.exists(i,j) ) ) continue;
+
+                Observation vec = observations(i,j);
+        
+                ReprojectionError reproj_error(vec(0),vec(1));
+                double residuals[2];
+                reproj_error( &intrinsics.focal, GetCameraPtr(i), GetCameraPtr(i)+3, GetPointPtr(j), residuals );
+                
+                double err = sqrt(residuals[0]*residuals[0] + residuals[1]*residuals[1]);
+                if ( err > thresh ) {
+                    observations.erase(i,j);
+                    nobs--;
+                    nremoved++;
+                    if ( nobs == 0 )
+                    {
+                        SetPoint( j, Eigen::Vector3d::Zero() );
+                    }
+                }
+            }
+        }
+        std::cout << "removed " << nremoved << " observations\n";
+    }
     
     void SfM::Apply( const Pose &pose )
     {

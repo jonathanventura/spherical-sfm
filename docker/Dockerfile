@@ -108,3 +108,6 @@ RUN git clone https://github.com/jonathanventura/polynomial.git && \
     make && \
     make install
 
+RUN apt-get update && apt-get -y install gdb
+RUN apt-get update && apt-get -y install libboost-all-dev
+
