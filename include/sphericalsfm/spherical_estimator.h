@@ -8,8 +8,10 @@ namespace sphericalsfm {
     class SphericalEstimator
     {
         const RayPairList &correspondences;
+        const bool use_poly_solver;
+        const bool inward;
     public:
-        SphericalEstimator(const RayPairList &_correspondences) : correspondences(_correspondences) { }
+        SphericalEstimator(const RayPairList &_correspondences, const bool _use_poly_solver, const bool _inward) : correspondences(_correspondences), use_poly_solver(_use_poly_solver), inward(_inward) { }
 
         inline int min_sample_size() const { return 3; }
 
@@ -17,7 +19,7 @@ namespace sphericalsfm {
 
         inline int num_data() const { return correspondences.size(); }
 
-        int MinimalSolver(const std::vector<int>& sample, std::vector<Eigen::Matrix3d>* Es) const;
+        virtual int MinimalSolver(const std::vector<int>& sample, std::vector<Eigen::Matrix3d>* Es) const;
 
         // Returns 0 if no model could be estimated and 1 otherwise.
         int NonMinimalSolver(const std::vector<int>& sample, Eigen::Matrix3d*E) const;

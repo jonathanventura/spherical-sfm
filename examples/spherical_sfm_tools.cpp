@@ -160,10 +160,10 @@ namespace sphericalsfmtools {
         double min_dist; // minimum distance between existing points and detecting points
         const int xradius; // horizontal tracking radius
         const int yradius; // vertical tracking radius
-        cv::Ptr<cv::xfeatures2d::SIFT> sift;
+        cv::Ptr<cv::SIFT> sift;
     public:
         DetectorTracker( double _min_dist=0, double _xradius=0, double _yradius=0 ) :
-        min_dist(_min_dist), xradius(_xradius), yradius(_yradius), sift(cv::xfeatures2d::SIFT::create(20000)) { }
+        min_dist(_min_dist), xradius(_xradius), yradius(_yradius), sift(cv::SIFT::create(20000)) { }
         
         void detect( const cv::Mat &image, Features &features )
         {
@@ -339,7 +339,7 @@ namespace sphericalsfmtools {
 
                 ray_pair_list.push_back( std::make_pair( u, v ) );
             }
-            SphericalEstimator estimator( ray_pair_list );
+            SphericalEstimator estimator( ray_pair_list, false, false );
             
             std::cout << "running ransac on " << ray_pair_list.size() << " matches\n";
             ransac_lib::LocallyOptimizedMSAC<Eigen::Matrix3d,std::vector<Eigen::Matrix3d>,SphericalEstimator> ransac;
@@ -454,7 +454,7 @@ namespace sphericalsfmtools {
                     ray_pair_list.push_back( std::make_pair( u, v ) );
                 }
                 
-                SphericalEstimator estimator(ray_pair_list);
+                SphericalEstimator estimator(ray_pair_list,false,false);
                 
                 ransac_lib::LocallyOptimizedMSAC<Eigen::Matrix3d,std::vector<Eigen::Matrix3d>,SphericalEstimator> ransac;
                 ransac_lib::RansacStatistics stats;

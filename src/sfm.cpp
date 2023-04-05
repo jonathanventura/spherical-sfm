@@ -19,7 +19,7 @@
 #include <RansacLib/ransac.h>
 #include <sphericalsfm/triangulation_estimator.h>
 
-#include <bits/stdc++.h>
+//#include <bits/stdc++.h>
 #include <iostream>
 #include <sys/stat.h>
 #include <sys/types.h>
