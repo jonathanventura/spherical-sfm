@@ -2,7 +2,7 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <sphericalsfm/estimator.h>
+#include <sphericalsfm/ray.h>
 
 namespace sphericalsfm {
     void make_spherical_essential_matrix( const Eigen::Matrix3d &R, bool inward, Eigen::Matrix3d &E );

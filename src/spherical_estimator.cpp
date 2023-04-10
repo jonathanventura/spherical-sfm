@@ -153,5 +153,12 @@ namespace sphericalsfm {
         
         make_spherical_essential_matrix(so3exp(r1),inward,*E);
     }
+
+    void SphericalEstimator::Decompose(const Eigen::Matrix3d &E, Eigen::Matrix3d *R, Eigen::Vector3d *t) const
+    {
+        Eigen::Vector3d r;
+        decompose_spherical_essential_matrix( E, inward, r, *t );
+        *R = so3exp(r);
+    }
 }
 

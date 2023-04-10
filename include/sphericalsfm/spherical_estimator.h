@@ -2,10 +2,11 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <sphericalsfm/estimator.h>
 #include <sphericalsfm/ray.h>
 
 namespace sphericalsfm {
-    class SphericalEstimator
+    class SphericalEstimator : public EssentialEstimator
     {
         const RayPairList &correspondences;
         const bool use_poly_solver;
@@ -29,5 +30,7 @@ namespace sphericalsfm {
 
         // Linear least squares solver. Calls NonMinimalSolver.
         void LeastSquares(const std::vector<int>& sample, Eigen::Matrix3d* E) const;
+
+        void Decompose(const Eigen::Matrix3d &E, Eigen::Matrix3d *R, Eigen::Vector3d *t) const;
     };
 }

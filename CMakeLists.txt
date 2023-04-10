@@ -43,4 +43,5 @@ target_link_libraries( sphericalsfm ${CERES_LIBRARIES} )
 target_link_libraries( sphericalsfm ${OpenCV_LIBS} )
 
 add_subdirectory( examples )
+add_subdirectory( evaluation )
 

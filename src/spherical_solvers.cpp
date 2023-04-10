@@ -291,7 +291,7 @@ namespace sphericalsfm {
         Es->clear();
         for ( int i = 0; i < 4; i++ )
         {
-            if ( fabs(evalues(i).imag()) > 1e-12 ) continue;
+            //if ( fabs(evalues(i).imag()) > 1e-12 ) continue;
             
             Eigen::Vector3d bsoln( V(1,i).real(), V(2,i).real(), V(3,i).real() );
             Eigen::Matrix<double,6,1> psoln( B*bsoln );
@@ -627,7 +627,8 @@ namespace sphericalsfm {
         const double e = G(4,3);
 
         double ysols[4];
-        int nsols = SolveQuarticReals(a,b,c,d,e,1e-15,ysols);
+        //int nsols = SolveQuarticReals(a,b,c,d,e,1e-15,ysols);
+        int nsols = SolveQuarticReals(a,b,c,d,e,ysols);
         
         double xsols[4];
         for ( int i = 0; i < nsols; i++ )

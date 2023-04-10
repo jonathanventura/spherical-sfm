@@ -20,13 +20,12 @@ namespace sphericalsfm {
         Eigen::Matrix3d U = svdE.matrixU();
         Eigen::Matrix3d V = svdE.matrixV();
         
-        // from theia sfm
         if (U.determinant() < 0) {
-            U.col(2) *= -1.0;
+            U *= -1;
         }
         
         if (V.determinant() < 0) {
-            V.col(2) *= -1.0;
+            V *= -1;
         }
         
         Eigen::Matrix3d D;
