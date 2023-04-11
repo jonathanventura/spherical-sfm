@@ -120,7 +120,7 @@ namespace sphericalsfm {
         }
         
         //Eigen::MatrixXd Q = A.jacobiSvd(Eigen::ComputeFullV).matrixV();
-        // QR(A.') --> last rows of Q are nullspace
+        // QR(A.') --> last columns of Q are nullspace
         Eigen::MatrixXd Q = A.transpose().colPivHouseholderQr().householderQ();
         Eigen::Matrix<double,6,3> B = Q.block(0,3,6,3);
 
@@ -313,7 +313,7 @@ namespace sphericalsfm {
     int spherical_solver_polynomial(const RayPairList &correspondences, const std::vector<int>& sample, std::vector<Eigen::Matrix3d>* Es)
     {
         const int N = sample.size();
-        if ( N != 3 )
+        if ( N < 3 )
         {
             std::cout << "bad sample size: " << N << "\n";
             return 0;
