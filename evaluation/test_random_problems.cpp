@@ -11,8 +11,8 @@
 
 #include <problem_generator/problem_generator.h>
 #include <sphericalsfm/spherical_estimator.h>
-#include "nister_estimator.h"
-#include "stewenius_estimator.h"
+#include <five_point/nister_estimator.h>
+#include <five_point/stewenius_estimator.h>
 
 #include <sphericalsfm/so3.h>
 
@@ -63,7 +63,9 @@ void evaluate( EssentialEstimator &estimator, int sample_size, const RelativePos
         // choose R,t
         Eigen::Matrix3d R;
         Eigen::Vector3d t;
-        estimator.Decompose(E,&R,&t);
+        std::vector<int> inliers(estimator.num_data());
+        for ( int i = 0; i < estimator.num_data(); i++ ) inliers[i] = i;
+        estimator.Decompose(E,inliers,&R,&t);
         rot_error = prob.soln.calc_rot_error(R);
 
         trans_error = prob.soln.calc_trans_error(t);
@@ -107,7 +109,7 @@ int main( int argc, char **argv )
 
     for ( int i = 0; i < FLAGS_ntrials; i++ )
     {
-        RelativePoseProblem prob = generator.make_random_problem(6,FLAGS_inward,FLAGS_rotation*M_PI/180);
+        RelativePoseProblem prob = generator.make_random_problem(6,FLAGS_inward,FLAGS_rotation);
         
         bool non_minimal = ( FLAGS_point_noise>0 );
         SphericalEstimator spherical_eig_estimator(prob.correspondences,false,FLAGS_inward);

@@ -25,7 +25,7 @@ namespace sphericalsfm {
     class EssentialEstimator : public Estimator<Eigen::Matrix3d>
     {
     public:
-        virtual void Decompose(const Eigen::Matrix3d &E, Eigen::Matrix3d *R, Eigen::Vector3d *t) const = 0;
+        virtual void Decompose(const Eigen::Matrix3d &E, const std::vector<int> &inliers, Eigen::Matrix3d *R, Eigen::Vector3d *t) const = 0;
     };
 }
 

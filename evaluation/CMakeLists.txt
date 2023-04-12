@@ -1,16 +1,10 @@
 include_directories( . )
 add_subdirectory( problem_generator )
+add_subdirectory( five_point )
 
-find_path(PoseLib_dirs PoseLib REQUIRED)
-find_library(PoseLib_libs PoseLib REQUIRED)
+add_executable(test_random_problems test_random_problems.cpp)
+target_link_libraries(test_random_problems gflags problem_generator five_point)
 
-include_directories( ${PoseLib_dirs} )
-
-add_executable(test_random_problems 
-    five_point_estimator.h five_point_estimator.cpp
-    nister_estimator.h nister_estimator.cpp
-    solver_stewenius.h solver_stewenius.cpp
-    stewenius_estimator.h stewenius_estimator.cpp
-    test_random_problems.cpp)
-target_link_libraries(test_random_problems sphericalsfm gflags problem_generator ${PoseLib_libs})
+add_executable(test_ransac test_ransac.cpp)
+target_link_libraries(test_ransac gflags problem_generator five_point )
 

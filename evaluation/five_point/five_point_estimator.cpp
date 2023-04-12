@@ -124,13 +124,13 @@ double FivePointEstimator::EvaluateModelOnPoint(const Eigen::Matrix3d& E, int i)
     return (d*d) / (line[0]*line[0] + line[1]*line[1]);
 }
 
-void FivePointEstimator::Decompose(const Eigen::Matrix3d &E, Eigen::Matrix3d *R, Eigen::Vector3d *t) const
+void FivePointEstimator::Decompose(const Eigen::Matrix3d &E, const std::vector<int> &inliers, Eigen::Matrix3d *R, Eigen::Vector3d *t) const
 {
-    std::vector<Eigen::Vector2d> points1(correspondences.size());
-    std::vector<Eigen::Vector2d> points2(correspondences.size());
-    for ( int i = 0; i < correspondences.size(); i++ )  {
-        points1[i] = correspondences[i].first.head(2)/correspondences[i].first(2);
-        points2[i] = correspondences[i].second.head(2)/correspondences[i].second(2);
+    std::vector<Eigen::Vector2d> points1(inliers.size());
+    std::vector<Eigen::Vector2d> points2(inliers.size());
+    for ( int i = 0; i < inliers.size(); i++ )  {
+        points1[i] = correspondences[inliers[i]].first.head(2)/correspondences[inliers[i]].first(2);
+        points2[i] = correspondences[inliers[i]].second.head(2)/correspondences[inliers[i]].second(2);
     }
     std::vector<Eigen::Vector3d> points3D;
     PoseFromEssentialMatrix(E, points1, points2, R, t, &points3D);
