@@ -14,7 +14,7 @@
 #include <five_point/nister_estimator.h>
 #include <five_point/stewenius_estimator.h>
 
-#include <RansacLib/ransac.h>
+#include "vanilla_ransac.h"
 
 #include <sphericalsfm/so3.h>
 
@@ -30,7 +30,8 @@ DEFINE_string(timings_path, "timings.tab", "Path for timings file");
 using namespace problem_generator;
 using namespace sphericalsfm;
 
-typedef ransac_lib::LocallyOptimizedMSAC<Eigen::Matrix3d,std::vector<Eigen::Matrix3d>,EssentialEstimator> RansacType;
+//typedef ransac_lib::LocallyOptimizedMSAC<Eigen::Matrix3d,std::vector<Eigen::Matrix3d>,EssentialEstimator> RansacType;
+typedef ransac_lib::VanillaMSAC<Eigen::Matrix3d,std::vector<Eigen::Matrix3d>,EssentialEstimator> RansacType;
 
 void evaluate( EssentialEstimator &estimator, const RelativePoseProblem &prob, FILE *outfile, FILE *timingsfile )
 {
@@ -38,13 +39,18 @@ void evaluate( EssentialEstimator &estimator, const RelativePoseProblem &prob, F
 
     RansacType ransac;
 
-    ransac_lib::LORansacOptions options;
+    //ransac_lib::LORansacOptions options;
+    //options.squared_inlier_threshold_ = pow(2/FLAGS_focal,2);
+    //options.lo_starting_iterations_ = INT_MAX;
+    //options.num_lsq_iterations_ = 0;
+    //options.num_lo_steps_ = 0;
+    //options.min_num_iterations_ = 0;
+    //options.max_num_iterations_ = INT_MAX;
+    //options.final_least_squares_ = false;
+
+    ransac_lib::RansacOptions options;
     options.squared_inlier_threshold_ = pow(2/FLAGS_focal,2);
-    options.num_lsq_iterations_ = 0;
-    options.num_lo_steps_ = 0;
-    options.min_num_iterations_ = 0;
     options.max_num_iterations_ = INT_MAX;
-    options.final_least_squares_ = false;
 
     std::vector<bool> inliers;
     ransac_lib::RansacStatistics ransac_stats;
