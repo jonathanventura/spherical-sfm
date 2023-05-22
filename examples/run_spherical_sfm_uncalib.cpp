@@ -92,7 +92,7 @@ int main( int argc, char **argv )
     // pick focal length with best final error
     const double min_focal = std::min(width,height)/4;
     const double max_focal = std::min(width,height)*16;
-    const int num_steps = 128;
+    const int num_steps = 1024;
     const double max_total_rot = 450*M_PI/180.;
     std::vector<Eigen::Matrix3d> rotations;
     double focal_new;

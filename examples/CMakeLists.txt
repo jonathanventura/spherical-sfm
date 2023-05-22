@@ -1,6 +1,7 @@
 find_package(OpenMP)
 find_package(gflags REQUIRED)
 find_package(Boost REQUIRED)
+find_package(GSL REQUIRED)
 
 add_executable( undistort_images
     undistort_images.cpp
@@ -14,6 +15,7 @@ add_executable( run_spherical_sfm
 )
 target_link_libraries( run_spherical_sfm sphericalsfm )
 target_link_libraries( run_spherical_sfm ${OpenCV_LIBS} gflags )
+target_link_libraries( run_spherical_sfm GSL::gsl )
 if ( OpenMP_FOUND )
     target_link_libraries( run_spherical_sfm OpenMP::OpenMP_CXX )
 endif()
@@ -26,6 +28,7 @@ add_executable( run_spherical_sfm_uncalib
 )
 target_link_libraries( run_spherical_sfm_uncalib sphericalsfm )
 target_link_libraries( run_spherical_sfm_uncalib ${OpenCV_LIBS} gflags )
+target_link_libraries( run_spherical_sfm_uncalib GSL::gsl )
 if ( OpenMP_FOUND )
     target_link_libraries( run_spherical_sfm_uncalib OpenMP::OpenMP_CXX )
 endif()

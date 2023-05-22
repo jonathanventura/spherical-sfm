@@ -3,7 +3,7 @@
 
 FROM nvidia/cuda:9.2-cudnn7-devel-ubuntu18.04
 
-ARG OPENCV_VERSION=4.1.0
+ARG OPENCV_VERSION=4.7.0
 
 # Install all dependencies for OpenCV
 RUN apt-get -y update && \
@@ -111,3 +111,14 @@ RUN git clone https://github.com/jonathanventura/polynomial.git && \
 RUN apt-get update && apt-get -y install gdb
 RUN apt-get update && apt-get -y install libboost-all-dev
 
+RUN git clone https://github.com/vlarsson/PoseLib.git && \
+    mkdir PoseLib-build && cd PoseLib-build && \
+    cmake ../PoseLib && \
+    make && \
+    make install
+RUN git clone https://github.com/laurentkneip/opengv.git && \
+    mkdir opengv-build && cd opengv-build && \
+    cmake ../opengv && \
+    make && \
+    make install
+RUN apt-get update && apt-get install libgsl-dev -y
