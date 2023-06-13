@@ -37,6 +37,7 @@ add_library( sphericalsfm
     include/sphericalsfm/plane_estimator.h src/plane_estimator.cpp
     include/sphericalsfm/spherical_utils.h src/spherical_utils.cpp
     include/sphericalsfm/rotation_averaging.h src/rotation_averaging.cpp
+    include/sphericalsfm/uncalibrated_pose_graph.h src/uncalibrated_pose_graph.cpp
 )
 #target_compile_features( sphericalsfm PRIVATE cxx_alias_templates )
 target_link_libraries( sphericalsfm ${CERES_LIBRARIES} )

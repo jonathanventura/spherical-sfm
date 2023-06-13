@@ -17,6 +17,7 @@
 #include <sphericalsfm/spherical_estimator.h>
 #include <sphericalsfm/so3.h>
 #include <sphericalsfm/rotation_averaging.h>
+#include <sphericalsfm/uncalibrated_pose_graph.h>
 #include <sphericalsfm/spherical_utils.h>
 
 #include <RansacLib/ransac.h>
@@ -890,7 +891,36 @@ namespace sphericalsfmtools {
         return cost;
     }
 
-    double optimize_focal_length( double initial_focal, double min_focal, double max_focal, FocalLengthSearchParams *params )
+    static double total_rotation_cost_fn( double focal, void * params )
+    {
+        FocalLengthSearchParams *search_params = (FocalLengthSearchParams *)params;
+
+        std::vector<ImageMatch> image_matches_new(search_params->image_matches);
+
+        Eigen::Vector3d T(focal/search_params->focal_guess,focal/search_params->focal_guess,1);
+        for ( int i = 0; i < search_params->image_matches.size(); i++ )
+        {
+            Eigen::Matrix3d E_new = T.asDiagonal() * search_params->Es[i] * T.asDiagonal();
+            Eigen::Vector3d r_new, t_new;
+            decompose_spherical_essential_matrix( E_new, search_params->inward, r_new, t_new );
+            image_matches_new[i].R = so3exp(r_new);
+        }
+
+        initialize_rotations( search_params->num_cameras, image_matches_new, search_params->rotations );
+
+        double total_rot = 0;
+        for ( int i = 1; i < search_params->num_cameras; i++ )
+        {
+            Eigen::Matrix3d relative_rotation = search_params->rotations[i].transpose() * search_params->rotations[i-1];
+            total_rot += so3ln(relative_rotation).norm();
+        }
+        
+        double cost = fabs(2*M_PI-total_rot);
+        
+        return cost;
+    }
+
+    double optimize_focal_length( double (* function) (double x, void * params), double initial_focal, double min_focal, double max_focal, FocalLengthSearchParams *params )
     {
         int status;
         int iter = 0, max_iter = 100;
@@ -898,7 +928,7 @@ namespace sphericalsfmtools {
         gsl_min_fminimizer *s;
         gsl_function F;
 
-        F.function = &focal_length_cost_fn;
+        F.function = function;
         F.params = params;
     
         double m = initial_focal;
@@ -946,13 +976,13 @@ namespace sphericalsfmtools {
       return m;
     }
 
-    bool find_best_focal_length( int num_cameras,
+    bool find_best_focal_length_new( int num_cameras,
                                  std::vector<ImageMatch> &image_matches,
                                  const bool inward,
                                  const double focal_guess,
                                  const double min_focal,
                                  const double max_focal,
-                                 const int num_steps,
+                                 const double min_total_rot,
                                  const double max_total_rot,
                                  std::vector<Eigen::Matrix3d> &rotations,
                                  double &best_focal )
@@ -961,7 +991,72 @@ namespace sphericalsfmtools {
         for ( int i = 0; i < image_matches.size(); i++ )
         {
             make_spherical_essential_matrix(image_matches[i].R,inward,Es[i]);
-            std::cout << i << "\n" << Es[i] << "\n\n";
+        }
+        std::vector<RelativeRotation> relative_rotations;
+        for ( int i = 0; i < image_matches.size(); i++ )
+        {
+            relative_rotations.push_back( RelativeRotation( image_matches[i].index0, image_matches[i].index1, image_matches[i].R ) );
+        }
+
+        FocalLengthSearchParams params(
+            num_cameras,
+            Es,
+            image_matches,
+            inward,
+            focal_guess );
+        
+        std::cout << "focal guess: " << focal_guess << "\n";
+        
+        // determine bounds
+        double lower_cost = total_rotation_cost_fn( min_focal, &params );
+        double mid_cost = total_rotation_cost_fn( focal_guess, &params );
+        double upper_cost = total_rotation_cost_fn( max_focal, &params );
+        std::cout << lower_cost << "\t" << mid_cost << "\t" << upper_cost << "\n";
+        best_focal = optimize_focal_length( &total_rotation_cost_fn, focal_guess, min_focal, max_focal, &params );
+        std::cout << "2pi focal: " << best_focal << "\n";
+        best_focal = focal_guess;
+
+        initialize_rotations( num_cameras, image_matches, rotations );
+    
+        double final_cost = optimize_rotations_and_focal_length( rotations, relative_rotations, best_focal, min_focal, max_focal, focal_guess, inward );
+        std::cout << "after optimization: " << best_focal << "\n";
+
+        // find total rotation
+        double total_rot = 0;
+        for ( int i = 1; i < num_cameras; i++ )
+        {
+            Eigen::Matrix3d relative_rotation = rotations[i].transpose() * rotations[i-1];
+            total_rot += so3ln(relative_rotation).norm();
+        }
+        std::cout << best_focal << " " << final_cost << " " << total_rot << "\n";
+        
+        return (total_rot >= min_total_rot && total_rot <= max_total_rot);
+    }
+
+    bool find_best_focal_length( int num_cameras,
+                                 std::vector<ImageMatch> &image_matches,
+                                 const bool inward,
+                                 const double focal_guess,
+                                 const double min_focal,
+                                 const double max_focal,
+                                 const int num_steps,
+                                 const double min_total_rot,
+                                 const double max_total_rot,
+                                 std::vector<Eigen::Matrix3d> &rotations,
+                                 double &best_focal )
+    {
+        std::vector<Eigen::Matrix3d> Es(image_matches.size());
+        for ( int i = 0; i < image_matches.size(); i++ )
+        {
+            make_spherical_essential_matrix(image_matches[i].R,inward,Es[i]);
+            //std::cout << i << "\n" << Es[i] << "\n\n";
+            //  (y^T K_guess^-T) E (K_guess^-1 x) = 0
+            //  (y^T K_new^-T) (K_new K_guess^-T E 
+        }
+        std::vector<RelativeRotation> relative_rotations;
+        for ( int i = 0; i < image_matches.size(); i++ )
+        {
+            relative_rotations.push_back( RelativeRotation( image_matches[i].index0, image_matches[i].index1, image_matches[i].R ) );
         }
 
         FocalLengthSearchParams params(
@@ -983,8 +1078,28 @@ namespace sphericalsfmtools {
         for ( int step = 0; step < num_steps; step++ )
         {
             double focal = min_focal + focal_step * step;
+            
 
-            double final_cost = focal_length_cost_fn( focal, &params );
+            /*
+            std::vector<ImageMatch> image_matches_new(image_matches);
+
+            Eigen::Vector3d T(focal/focal_guess,focal/focal_guess,1);
+            for ( int i = 0; i < image_matches.size(); i++ )
+            {
+                Eigen::Matrix3d E_new = T.asDiagonal() * Es[i] * T.asDiagonal();
+                Eigen::Vector3d r_new, t_new;
+                decompose_spherical_essential_matrix( E_new, inward, r_new, t_new );
+                image_matches_new[i].R = so3exp(r_new);
+            }
+
+            initialize_rotations( num_cameras, image_matches_new, params.rotations );
+            std::cout << "before optimization: " << focal << "\n";
+            double final_cost = optimize_rotations_and_focal_length( params.rotations, relative_rotations, focal, focal_guess, inward );
+            std::cout << "after optimization: " << focal << "\n";
+            */
+
+            //double final_cost = focal_length_cost_fn( focal, &params );
+            double final_cost = total_rotation_cost_fn( focal, &params );
             
             // find total rotation
             double total_rot = 0;
@@ -995,13 +1110,15 @@ namespace sphericalsfmtools {
             }
             std::cout << focal << " " << final_cost << " " << total_rot << "\n";
             fprintf(f,"%d %lf %lf %lf\n",step,focal,final_cost,total_rot);
-            if ( total_rot < max_total_rot )
+            if ( total_rot > min_total_rot && total_rot < max_total_rot )
             {
                 if ( focal < min_good_focal ) min_good_focal = focal;
                 if ( focal > max_good_focal ) max_good_focal = focal;
             }
                 
-            if ( final_cost < best_cost && total_rot < max_total_rot )
+            if ( final_cost < best_cost && 
+                total_rot > min_total_rot &&
+                total_rot < max_total_rot )
             {
                 best_cost = final_cost;
                 best_focal = focal;
@@ -1028,11 +1145,16 @@ namespace sphericalsfmtools {
 
         if ( found_one )
         {
-            if ( best_focal == max_good_focal ) max_good_focal += 1;
-            std::cout << "range: " << min_good_focal << " " << max_good_focal << "\n";
+            //if ( best_focal == max_good_focal ) max_good_focal += 1;
+
+            
+            //std::cout << "range: " << min_good_focal << " " << max_good_focal << "\n";
             std::cout << "before optimization: " << best_focal << "\n";
-            best_focal = optimize_focal_length( best_focal, min_good_focal, max_good_focal, &params );
+            //best_focal = optimize_focal_length( best_focal, min_good_focal, max_good_focal, &params );
+            //std::cout << "after optimization: " << best_focal << "\n";
+            optimize_rotations_and_focal_length( rotations, relative_rotations, best_focal, min_good_focal, max_good_focal, focal_guess, inward );
             std::cout << "after optimization: " << best_focal << "\n";
+            
         }
 
         //std::vector<Eigen::Matrix3d> rotations;

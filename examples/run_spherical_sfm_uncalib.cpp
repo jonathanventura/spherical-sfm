@@ -93,12 +93,14 @@ int main( int argc, char **argv )
     const double min_focal = std::min(width,height)/4;
     const double max_focal = std::min(width,height)*16;
     const int num_steps = 1024;
+    const double min_total_rot = 270*M_PI/180.;
     const double max_total_rot = 450*M_PI/180.;
     std::vector<Eigen::Matrix3d> rotations;
     double focal_new;
     bool success = find_best_focal_length( keyframes.size(), 
             image_matches, FLAGS_inward, focal_guess,
             min_focal, max_focal, num_steps,
+            min_total_rot,
             max_total_rot,
             rotations,
             focal_new );
@@ -109,6 +111,7 @@ int main( int argc, char **argv )
     }
     std::cout << " best focal: " << focal_new << "\n";
     Intrinsics intrinsics(focal_new,centerx,centery);
+    //exit(0);
     
     /*
     std::cout << "initializing rotations\n";
