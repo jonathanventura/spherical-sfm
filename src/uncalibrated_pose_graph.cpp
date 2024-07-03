@@ -13,16 +13,42 @@
 
 namespace sphericalsfm {
 
+    static void decompose_rotation( const Eigen::Matrix3d &R, double &rx, double &ry, double &thetaxy, double &thetaz )
+    {
+        Eigen::Vector3d Z = R.col(2);
+        Z = Z/Z.norm();
+        Eigen::Vector3d out(0,0,1);
+        Eigen::Vector3d axis = out.cross(Z);
+        Eigen::Vector3d rxy = axis/axis.norm();
+        thetaxy = acos(Z.dot(out));
+        Eigen::Matrix3d Rxy = so3exp(thetaxy*rxy);
+        rx = rxy(0);
+        ry = rxy(1);
+
+        Eigen::Matrix3d Rz = Rxy.transpose()*R;
+        Eigen::Vector3d rz = so3ln(Rz);
+        thetaz = rz(2);
+    }
+
     struct UncalibratedPoseGraphError
     {
         UncalibratedPoseGraphError(
-            const Eigen::Matrix3d &_E_guess,
-            const double _focal_guess,
-            const double _rx,
-            const double _ry,
-            const double _thetaz,
-            const double &_scale,
-            const bool _inward ) : E_guess(_E_guess), focal_guess(_focal_guess), rx(_rx), ry(_ry), thetaz(_thetaz), scale(_scale), inward(_inward) { }
+            //const Eigen::Matrix3d &_E_guess,
+            //const double _focal_guess,
+            //const double _rx,
+            //const double _ry,
+            //const double _thetaxy,
+            //const double _thetaz,
+            const Eigen::Matrix3d &_F,
+            const double &_scale ,
+            const bool &_inward )
+            : scale( _scale )
+            //: E_guess(_E_guess), focal_guess(_focal_guess), rx(_rx), ry(_ry), thetaz(_thetaz), scale(_scale), inward(_inward) { }
+        {
+            Eigen::Vector3d r, t;
+            decompose_spherical_essential_matrix( _F, _inward, r, t );
+            decompose_rotation( so3exp(r), rx, ry, thetaxy, thetaz );
+        }
         
         template <typename T>
         bool operator()(const T* const r0,
@@ -30,6 +56,7 @@ namespace sphericalsfm {
                         const T* const f,
                         T* residuals) const
         {
+            /*
             Eigen::Matrix<T,3,3> TT = Eigen::Matrix<T,3,3>::Identity();
             TT(0,0) = *f/focal_guess;
             TT(1,1) = *f/focal_guess;
@@ -61,10 +88,15 @@ namespace sphericalsfm {
             T s = (T(2)*E(0,0)*(- sz*rx2 + T(2)*cz*rx*ry + sz*ry2))/(rx4*sz2 + ry4*sz2 + E(0,0)*E(0,0) + T(4)*rx2*ry2*cz2 - T(2)*rx2*ry2*sz2 + T(4)*rx*ry3*cz*sz - T(4)*rx3*ry*cz*sz);
             T c = (rx4*sz2 + ry4*sz2 - E(0,0)*E(0,0) + T(4)*rx2*ry2*cz2 - T(2)*rx2*ry2*sz2 + T(4)*rx*ry3*cz*sz - T(4)*rx3*ry*cz*sz)/(rx4*sz2 + ry4*sz2 + E(0,0)*E(0,0) + T(4)*rx2*ry2*cz2 - T(2)*rx2*ry2*sz2 + T(4)*rx*ry3*cz*sz - T(4)*rx3*ry*cz*sz);
             T thetaxy = atan2(s,c);
+            */
+            const T fsq = (*f)*(*f);
+            const T num = T(2)*(*f)*sin(thetaxy);
+            const T den = (T(1)+fsq)*cos(thetaxy)+(T(1)-fsq);
+            const T thetaxyp = atan2(num,den);
 
             // compute Rxy and Rz
-            T rxy[3] = { thetaxy*rx, thetaxy*ry, T(0) };
-            T rz[3] = { T(0), T(0), thetaz };
+            const T rxy[3] = { thetaxyp*rx, thetaxyp*ry, T(0) };
+            const T rz[3] = { T(0), T(0), T(thetaz) };
             Eigen::Matrix<T,3,3> Rxy, Rz;
             ceres::AngleAxisToRotationMatrix( rxy, Rxy.data() );
             ceres::AngleAxisToRotationMatrix( rz, Rz.data() );
@@ -85,29 +117,12 @@ namespace sphericalsfm {
             return true;
         }
         
-        Eigen::Matrix3d E_guess;
-        double focal_guess;
-        double rx, ry, thetaz;
+        //Eigen::Matrix3d E_guess;
+        //double focal_guess;
+        double rx, ry, thetaxy, thetaz;
         double scale;
-        bool inward;
+        //bool inward;
     };
-
-    static void decompose_rotation( const Eigen::Matrix3d &R, double &rx, double &ry, double &thetaxy, double &thetaz )
-    {
-        Eigen::Vector3d Z = R.col(2);
-        Z = Z/Z.norm();
-        Eigen::Vector3d out(0,0,1);
-        Eigen::Vector3d axis = out.cross(Z);
-        Eigen::Vector3d rxy = axis/axis.norm();
-        thetaxy = acos(Z.dot(out));
-        Eigen::Matrix3d Rxy = so3exp(thetaxy*rxy);
-        rx = rxy(0);
-        ry = rxy(1);
-
-        Eigen::Matrix3d Rz = Rxy.transpose()*R;
-        Eigen::Vector3d rz = so3ln(Rz);
-        thetaz = rz(2);
-    }
 
     double optimize_rotations_and_focal_length( 
         std::vector<Eigen::Matrix3d> &rotations, 
@@ -134,11 +149,16 @@ namespace sphericalsfm {
             Eigen::Matrix3d E;
             make_spherical_essential_matrix( relative_rotations[i].R, inward, E );
             
+            // compute F
+            Eigen::Matrix3d Kinv = Eigen::Matrix3d::Identity();
+            Kinv(2,2) = focal_length;
+            Eigen::Matrix3d F = Kinv * E * Kinv;
             // decompose rotation into xy and z rotations
-            double rx, ry, thetaxy, thetaz;
-            decompose_rotation( relative_rotations[i].R, rx, ry, thetaxy, thetaz );
+            //double rx, ry, thetaxy, thetaz;
+            //decompose_rotation( relative_rotations[i].R, rx, ry, thetaxy, thetaz );
             
-            UncalibratedPoseGraphError *error = new UncalibratedPoseGraphError(E,focal_guess,rx,ry,thetaz,1/max_rel_rot_norm,inward);
+            //UncalibratedPoseGraphError *error = new UncalibratedPoseGraphError(E,focal_guess,rx,ry,thetaz,1/max_rel_rot_norm,inward);
+            UncalibratedPoseGraphError *error = new UncalibratedPoseGraphError(F,1/max_rel_rot_norm,inward);
             ceres::CostFunction* cost_function = new ceres::AutoDiffCostFunction<UncalibratedPoseGraphError, 3, 3, 3, 1>(error);
             problem.AddResidualBlock(cost_function,
                 loss_function,
