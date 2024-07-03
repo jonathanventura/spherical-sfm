@@ -1,97 +1,18 @@
 # https://www.learnopencv.com/install-opencv3-on-ubuntu
 # https://docs.opencv.org/3.4/d6/d15/tutorial_building_tegra_cuda.html
 
-FROM nvidia/cuda:9.2-cudnn7-devel-ubuntu18.04
+FROM nvidia/cuda:12.0.0-devel-ubuntu22.04
+#FROM ubuntu:24.04
+ARG DEBIAN_FRONTEND=noninteractive
 
-ARG OPENCV_VERSION=4.7.0
 
 # Install all dependencies for OpenCV
-RUN apt-get -y update && \
-    apt-get -y install \
-        wget \
-        unzip \
-        cmake \
-        libtbb2 \
-        gfortran \
-        apt-utils \
-        pkg-config \
-        checkinstall \
-        qt5-default \
-        build-essential \
-        libatlas-base-dev \
-        libgtk2.0-dev \
-        libavcodec-dev \
-        libavformat-dev \
-        libavutil-dev \
-        libswscale-dev \
-        libjpeg8-dev \
-        libpng-dev \
-        libtiff5-dev \
-        libdc1394-22-dev \
-        libxine2-dev \
-        libv4l-dev \
-        libgstreamer1.0 \
-        libgstreamer1.0-dev \
-        libgstreamer-plugins-base1.0-dev \
-        libglew-dev \
-        libpostproc-dev \
-        libeigen3-dev \
-        libtbb-dev \
-        zlib1g-dev \
-        libsm6 \
-        libxext6 \
-        libxrender1 \
-        libgoogle-glog-dev \
-        libatlas-base-dev \
-        libeigen3-dev \
-        libsuitesparse-dev \
-        ffmpeg
+ENV TZ="America/Los_Angeles"
+RUN apt-get -y update 
+RUN apt-get -y install libopencv-dev git wget gdb libboost-all-dev cmake build-essential libeigen3-dev
+RUN apt-get -y install libgoogle-glog-dev
 
 WORKDIR /
-
-# Install OpenCV
-RUN    wget https://github.com/opencv/opencv/archive/$OPENCV_VERSION.zip -O opencv.zip --progress=bar:force:noscroll && \
-    unzip -q opencv.zip && \
-    mv /opencv-$OPENCV_VERSION /opencv && \
-    rm opencv.zip && \
-    wget https://github.com/opencv/opencv_contrib/archive/$OPENCV_VERSION.zip -O opencv_contrib.zip --progress=bar:force:noscroll && \
-    unzip -q opencv_contrib.zip && \
-    mv /opencv_contrib-$OPENCV_VERSION /opencv_contrib && \
-    rm opencv_contrib.zip
-# Prepare build
-RUN mkdir /opencv/build && \
-    cd /opencv/build && \
-    cmake -D CMAKE_BUILD_TYPE=RELEASE \
-      -D BUILD_PYTHON_SUPPORT=ON \
-      -D CMAKE_INSTALL_PREFIX=/usr/local \
-      -D OPENCV_EXTRA_MODULES_PATH=/opencv_contrib/modules \
-      -D OPENCV_ENABLE_NONFREE=ON \
-      -D BUILD_EXAMPLES=OFF \
-      -D BUILD_PERF_TESTS=OFF \
-      -D BUILD_TESTS=OFF \
-      -D WITH_IPP=OFF \
-      -D WITH_FFMPEG=ON \
-      -D WITH_GSTREAMER=ON \
-      -D WITH_V4L=ON \
-      -D WITH_LIBV4L=ON \
-      -D WITH_TBB=ON \
-      -D WITH_QT=OFF \
-      -D WITH_OPENGL=OFF \
-      -D WITH_CUDA=ON \
-      -D CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda-9.2 \
-      -D CUDA_ARCH_PTX="" \
-      -D WITH_CUBLAS=ON \
-      -D ENABLE_FAST_MATH=1 \
-      -D CUDA_FAST_MATH=1 \
-      .. \
-    && \
-# Build, Test and Install
-    cd /opencv/build && \
-    make -j$(nproc) && \
-    make install && \
-    ldconfig
-
-RUN apt-get update && apt-get install -y git
 
 # Install ceres-solver
 RUN wget http://ceres-solver.org/ceres-solver-2.1.0.tar.gz && \
@@ -108,17 +29,45 @@ RUN git clone https://github.com/jonathanventura/polynomial.git && \
     make && \
     make install
 
-RUN apt-get update && apt-get -y install gdb
-RUN apt-get update && apt-get -y install libboost-all-dev
-
 RUN git clone https://github.com/vlarsson/PoseLib.git && \
     mkdir PoseLib-build && cd PoseLib-build && \
     cmake ../PoseLib && \
     make && \
     make install
-RUN git clone https://github.com/laurentkneip/opengv.git && \
-    mkdir opengv-build && cd opengv-build && \
-    cmake ../opengv && \
-    make && \
-    make install
-RUN apt-get update && apt-get install libgsl-dev -y
+
+
+RUN apt-get -y install libgsl-dev
+RUN apt-get -y install libopencv-contrib-dev
+
+RUN apt-get install \
+    git \
+    cmake \
+    ninja-build \
+    build-essential \
+    libboost-program-options-dev \
+    libboost-filesystem-dev \
+    libboost-graph-dev \
+    libboost-system-dev \
+    libeigen3-dev \
+    libflann-dev \
+    libfreeimage-dev \
+    libmetis-dev \
+    libgoogle-glog-dev \
+    libgtest-dev \
+    libsqlite3-dev \
+    libglew-dev \
+    libcgal-dev \
+    libceres-dev \
+    nvidia-cuda-toolkit \
+    nvidia-cuda-toolkit-gcc -y
+
+
+RUN git clone https://github.com/colmap/colmap.git &&\ 
+    cd colmap && \
+    mkdir build && \
+    cd build && \
+    cmake .. -GNinja -DGUI_ENABLED=OFF -DCUDA_ENABLED=ON -DCMAKE_CUDA_ARCHITECTURES=70 && \
+    ninja -j8 && \
+    ninja install
+
+#RUN apt-get -y install colmap
