@@ -81,15 +81,21 @@ namespace sphericalsfmtools {
 
     void show_reprojection_error( std::vector<Keyframe> &keyframes, sphericalsfm::SfM &sfm );
 
-    bool find_best_focal_length( int num_cameras,
+    bool find_best_focal_length_opt( int num_cameras,
                                  std::vector<ImageMatch> &image_matches,
-                                 const bool inward,
-                                 const double focal_guess,
-                                 const double min_focal,
-                                 const double max_focal,
-                                 const int num_steps,
-                                 const double min_total_rot,
-                                 const double max_total_rot,
+                                 bool inward,
+                                 double focal_guess,
+                                 double min_focal,
+                                 double max_focal,
+                                 std::vector<Eigen::Matrix3d> &rotations,
+                                 double &best_focal );
+    bool find_best_focal_length_grid( int num_cameras,
+                                 std::vector<ImageMatch> &image_matches,
+                                 bool inward,
+                                 double focal_guess,
+                                 double min_focal,
+                                 double max_focal,
+                                 int num_steps,
                                  std::vector<Eigen::Matrix3d> &rotations,
                                  double &best_focal );
 }
