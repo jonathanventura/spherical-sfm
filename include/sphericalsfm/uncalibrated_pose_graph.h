@@ -5,6 +5,11 @@
 
 namespace sphericalsfm {
 
+    double get_cost( 
+        std::vector<Eigen::Matrix3d> &rotations, 
+        const std::vector<RelativeRotation> &relative_rotations
+    );
+
     double optimize_rotations_and_focal_length( 
         std::vector<Eigen::Matrix3d> &rotations, 
         const std::vector<RelativeRotation> &relative_rotations, 

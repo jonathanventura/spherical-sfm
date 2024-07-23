@@ -17,15 +17,15 @@
 using namespace sphericalsfm;
 using namespace sphericalsfmtools;
 
-DEFINE_string(video, "", "Path to video or image search pattern like frame%06d.png");
+DEFINE_string(images, "", "Path to video or image search pattern like frame%06d.png");
 DEFINE_string(output, "", "Path to output directory");
 DEFINE_double(inlierthresh, 2.0, "Inlier threshold in pixels");
 DEFINE_int32(mininliers, 100, "Minimum number of inliers to accept a loop closure");
 DEFINE_int32(numbegin, 30, "Number of frames at beginning of sequence to use for loop closure");
 DEFINE_int32(numend, 30, "Number of frames at end of sequence to use for loop closure");
-DEFINE_bool(bestonly, false, "Accept only the best loop closure");
-DEFINE_bool(noloopclosure, false, "Allow there to be no loop closures");
 DEFINE_bool(inward, false, "Cameras are inward facing");
+DEFINE_bool(sequential, false, "Images are sequential");
+DEFINE_bool(generalba, false, "Run general bundle adjustment step");
 
 int main( int argc, char **argv )
 {
@@ -33,11 +33,11 @@ int main( int argc, char **argv )
 
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     
-    cv::VideoCapture cap(FLAGS_video);
+    cv::VideoCapture cap(FLAGS_images);
     cv::Mat image0_in;
     if ( !cap.read(image0_in) )
     {
-        std::cout << "error: could not read single frame from " << FLAGS_video << "\n";
+        std::cout << "error: could not read single frame from " << FLAGS_images << "\n";
         exit(1);
     }
     int width = image0_in.cols;
@@ -58,16 +58,15 @@ int main( int argc, char **argv )
     std::vector<ImageMatch> image_matches;
     if ( !read_feature_tracks( FLAGS_output, keyframes, image_matches ) )
     {
-        std::cout << "tracking features in video: " << FLAGS_video << "\n";
+        std::cout << "extract features from images: " << FLAGS_images << "\n";
 
-        detect_features( FLAGS_video, keyframes );
-        std::cout << "detecting loop closures\n";
+        detect_features( FLAGS_images, keyframes );
+        std::cout << "matching images\n";
         int loop_closure_count = match_exhaustive( intrinsics_guess, keyframes, image_matches,
                             FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_inward );
-        if ( FLAGS_bestonly ) std::cout << "only using best loop closure\n";
-        if ( !FLAGS_noloopclosure && loop_closure_count == 0 ) 
+        if ( loop_closure_count == 0 ) 
         {
-            std::cout << "error: no loop closures found\n";
+            std::cout << "error: no matches found\n";
             exit(1);
         }
 
@@ -75,7 +74,7 @@ int main( int argc, char **argv )
     }
     else
     {
-        read_images( FLAGS_video, keyframes );
+        read_images( FLAGS_images, keyframes );
     }
     
     const double min_focal = focal_guess/4;
@@ -86,16 +85,22 @@ int main( int argc, char **argv )
     std::vector<Eigen::Matrix3d> rotations;
     double focal_new;
     bool success = find_best_focal_length_opt( keyframes.size(), 
-            image_matches, FLAGS_inward, focal_guess,
+            image_matches, FLAGS_inward, FLAGS_sequential, focal_guess,
             min_focal, max_focal,
             rotations,
             focal_new );
+    //bool success = find_best_focal_length_grid( keyframes.size(), 
+            //image_matches, FLAGS_inward, FLAGS_sequential, focal_guess,
+            //min_focal, max_focal, num_steps,
+            //rotations,
+            //focal_new );
     if ( !success )
     {
         std::cout << "ERROR: could not find any acceptable focal length\n";
         exit(1);
     }
     std::cout << " best focal: " << focal_new << "\n";
+    //exit(0);
     Intrinsics intrinsics(focal_new,centerx,centery);
 
     std::cout << "building sfm\n";
@@ -116,20 +121,24 @@ int main( int argc, char **argv )
     std::cout << "focal after spherical BA: " << sfm.GetFocal() << "\n";
     
 
-    // --- general SFM ---
-    // unfix translations
-    for ( int i = 1; i < sfm.GetNumCameras(); i++ )
+    if ( FLAGS_generalba )
     {
-        sfm.SetTranslationFixed(i,false);
-    }
+        // --- general SFM ---
+        // unfix translations
+        for ( int i = 1; i < sfm.GetNumCameras(); i++ )
+        {
+            sfm.SetTranslationFixed(i,false);
+        }
 
-    std::cout << "running general optimization\n";
-    sfm.Optimize();
-    sfm.Normalize( FLAGS_inward );
-    sfm.Retriangulate();
-    sfm.Optimize();
-    sfm.Normalize( FLAGS_inward );
-    std::cout << "done.\n";
+        std::cout << "running general optimization\n";
+        sfm.Optimize();
+        sfm.Normalize( FLAGS_inward );
+        sfm.Retriangulate();
+        sfm.Optimize();
+        sfm.Normalize( FLAGS_inward );
+        std::cout << "done.\n";
+        std::cout << "focal after general BA: " << sfm.GetFocal() << "\n";
+    }
 
     std::vector<int> keyframe_indices(keyframes.size());
     for ( int i = 0; i < keyframes.size(); i++ ) keyframe_indices[i] = keyframes[i].index;
@@ -139,8 +148,6 @@ int main( int argc, char **argv )
 
     sfm.WriteCOLMAP( FLAGS_output, keyframes[0].image.cols, keyframes[0].image.rows );
         
-    //show_reprojection_error( keyframes, sfm );
-    std::cout << "focal after general BA: " << sfm.GetFocal() << "\n";
 
     std::string calib_path = FLAGS_output + "/calib.txt";
     FILE *calibf = fopen(calib_path.c_str(), "w");

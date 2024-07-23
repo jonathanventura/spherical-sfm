@@ -21,6 +21,18 @@ include_directories( ${OPENCV_INCLUDE_DIRS} )
 find_package( Eigen3 REQUIRED )
 include_directories( ${EIGEN3_INCLUDE_DIR} )
 
+find_package(Gopt REQUIRED)
+if(GOPT_FOUND)
+  message(STATUS "Found GOPT_INCLUDE_DIRs ${GOPT_INCLUDE_DIRS}")
+  message(STATUS "Found GOPT_LINK_DIRs ${GOPT_LINK_DIRS}")
+  message(STATUS "Found GOPT_LIBRARIES ${GOPT_LIBRARIES}")
+else(GOPT_FOUND)
+  message(FATAL "GOPT not found!")
+endif(GOPT_FOUND)
+
+include_directories(${GOPT_INCLUDE_DIRS})
+link_directories(${GOPT_LINK_DIRS})
+
 include_directories( include )
 add_library( sphericalsfm
     include/sphericalsfm/ray.h
@@ -42,6 +54,7 @@ add_library( sphericalsfm
 #target_compile_features( sphericalsfm PRIVATE cxx_alias_templates )
 target_link_libraries( sphericalsfm ${CERES_LIBRARIES} )
 target_link_libraries( sphericalsfm ${OpenCV_LIBS} )
+target_link_libraries( sphericalsfm ${GOPT_LIBRARIES} )
 
 add_subdirectory( examples )
 add_subdirectory( evaluation )
