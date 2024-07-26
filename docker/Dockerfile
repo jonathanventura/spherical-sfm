@@ -71,8 +71,17 @@ RUN apt-get install \
     libglew-dev \
     libcgal-dev -y
 
-RUN git clone https://github.com/colmap/colmap.git &&\ 
-    cd colmap && \
+#RUN git clone https://github.com/colmap/colmap.git &&\ 
+    #cd colmap && \
+    #mkdir build && \
+    #cd build && \
+    #cmake .. -DGUI_ENABLED=OFF -DCUDA_ENABLED=ON -DCMAKE_CUDA_ARCHITECTURES=70 && \
+    #make -j8 && \
+    #make install
+
+RUN wget https://github.com/colmap/colmap/archive/refs/tags/3.9.1.zip && \
+    unzip 3.9.1.zip && \
+    cd colmap-3.9.1 && \
     mkdir build && \
     cd build && \
     cmake .. -DGUI_ENABLED=OFF -DCUDA_ENABLED=ON -DCMAKE_CUDA_ARCHITECTURES=70 && \

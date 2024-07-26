@@ -49,8 +49,10 @@ int main( int argc, char **argv )
         detect_features( FLAGS_images, keyframes );
 
         std::cout << "detecting loop closures\n";
-        int loop_closure_count = match_exhaustive( intrinsics, keyframes, image_matches,
-                            FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_inward );
+        std::vector<ImageMatch> all_image_matches;
+        match_exhaustive( keyframes, all_image_matches );
+        int loop_closure_count = estimate_pairwise( intrinsics, keyframes, all_image_matches,
+                            FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_inward, image_matches );
         if ( loop_closure_count == 0 ) 
         {
             std::cout << "error: no loop closures found\n";

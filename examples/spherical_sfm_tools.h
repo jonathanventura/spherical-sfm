@@ -62,8 +62,9 @@ namespace sphericalsfmtools {
 
     void match( const Features &features0, const Features &features1, Matches &m01, double ratio = 0.75 );
     void detect_features( const std::string &videopath, std::vector<Keyframe> &keyframes );
-    int match_exhaustive( const sphericalsfm::Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
-                            const double inlier_threshold, const int min_num_inliers, const bool inward );
+    int estimate_pairwise( const sphericalsfm::Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches,
+                            const double inlier_threshold, const int min_num_inliers, const bool inward, std::vector<ImageMatch> &image_matches_out );
+    void match_exhaustive( const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches );
     void build_feature_tracks( const sphericalsfm::Intrinsics &intrinsics, const std::string &videopath,
                               std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
                               const double inlier_threshold, const double min_rot,

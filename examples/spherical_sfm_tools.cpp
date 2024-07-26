@@ -424,9 +424,9 @@ namespace sphericalsfmtools {
             std::cout << "image " << i << " has " << keyframe.features.size() << " features\n";
         }
     }
-
-    int match_exhaustive( const Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
-                            const double inlier_threshold, const int min_num_inliers, const bool inward )
+    
+    int estimate_pairwise( const Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches,
+                            const double inlier_threshold, const int min_num_inliers, const bool inward, std::vector<ImageMatch> &image_matches_out )
     {
         Eigen::Matrix3d Kinv = intrinsics.getKinv();
         
@@ -458,8 +458,15 @@ namespace sphericalsfmtools {
             const Features &features1 = keyframes[index1].features;
 
             Matches m01;
-                
-            match( features0, features1, m01 );
+             
+            for ( auto m : image_matches )
+            { 
+                if ( m.index0 == index0 && m.index1 == index1 )
+                {
+                    m01 = m.matches;
+                    break;
+                }
+            }
             if ( m01.size() < min_num_inliers ) continue;
 
             std::vector<bool> inliers;
@@ -536,10 +543,36 @@ namespace sphericalsfmtools {
         {
             if ( my_image_matches[i].matches.empty() ) continue;
             if ( my_image_matches[i].index0 + 1 != my_image_matches[i].index1 ) loop_closure_count++;
-            image_matches.push_back( my_image_matches[i] );
+            image_matches_out.push_back( my_image_matches[i] );
         }
         
         return loop_closure_count;
+    }
+
+    void match_exhaustive( const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches )
+    {
+        for ( int index0 = 0; index0 < keyframes.size(); index0++ )
+        {
+            for ( int index1 = index0+1; index1 < keyframes.size(); index1++ )
+            {
+                Matches m;
+                Eigen::Matrix3d R;
+                ImageMatch image_match(index0, index1, m, R);
+                image_matches.push_back(image_match);
+            }
+        }
+
+#pragma omp parallel for
+        for ( int i = 0; i < image_matches.size(); i++ ) 
+        {
+            ImageMatch &image_match = image_matches[i];
+            int index0 = image_match.index0;
+            int index1 = image_match.index1;
+            const Features &features0 = keyframes[index0].features;
+            const Features &features1 = keyframes[index1].features;
+
+            match( features0, features1, image_match.matches );
+        }
     }
 
     int make_loop_closures( const Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,

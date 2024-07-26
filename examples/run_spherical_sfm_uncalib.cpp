@@ -12,6 +12,7 @@
 
 #include "spherical_sfm_tools.h"
 #include "spherical_sfm_io.h"
+#include "colmap.h"
 #include <sphericalsfm/so3.h>
 
 using namespace sphericalsfm;
@@ -26,44 +27,81 @@ DEFINE_int32(numend, 30, "Number of frames at end of sequence to use for loop cl
 DEFINE_bool(inward, false, "Cameras are inward facing");
 DEFINE_bool(sequential, false, "Images are sequential");
 DEFINE_bool(generalba, false, "Run general bundle adjustment step");
+DEFINE_bool(colmap, false, "Load feature matches from COLMAP");
 
 int main( int argc, char **argv )
 {
     srand(0);
-
+    
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     
-    cv::VideoCapture cap(FLAGS_images);
-    cv::Mat image0_in;
-    if ( !cap.read(image0_in) )
-    {
-        std::cout << "error: could not read single frame from " << FLAGS_images << "\n";
-        exit(1);
-    }
-    int width = image0_in.cols;
-    int height = image0_in.rows;
-    
-    double focal_guess = (width+height)/2;//sqrt(width*width+height*height);
-    double centerx = width/2;
-    double centery = height/2;
-    std::cout << "initial focal: " << focal_guess << "\n";
-    Intrinsics intrinsics_guess(focal_guess,centerx,centery);
-    int min_rot_pixels = 35;
-    // theta = 2*atan2(w,2*f)
-    double min_rot = 0;//2*atan2(min_rot_pixels,2*focal_guess)*180/M_PI;
-    //std::cout << "min_rot: " << min_rot << " [deg]\n";
-    //std::cout << "min_rot: " << min_rot*M_PI/180. << " [rad]\n";
-    
+    int width, height;
+    double focal_guess;
+    double centerx, centery;
     std::vector<Keyframe> keyframes;
     std::vector<ImageMatch> image_matches;
     if ( !read_feature_tracks( FLAGS_output, keyframes, image_matches ) )
     {
-        std::cout << "extract features from images: " << FLAGS_images << "\n";
+        std::vector<ImageMatch> all_image_matches;
+        if ( FLAGS_colmap )
+        {
+            COLMAP::Database db( FLAGS_output + "/database.db" );
+            int index = 0;
+            for ( auto it : db.images )
+            {
+                std::cout << it.second.name << "\n";
+                if ( index == 0 )
+                {
+                    cv::Mat image = cv::imread(FLAGS_images + "/" + it.second.name);
+                    width = image.cols;
+                    height = image.rows;
+                }
+                Features features;
+                for ( auto kp : it.second.keypoints )
+                {
+                    features.points.push_back( cv::Point2f( kp.x(0), kp.x(1) ) );
+                    features.descs.push_back( cv::Mat::zeros(1,128,CV_32F) );
+                }
+                Keyframe kf( index++, features );
+                keyframes.push_back( kf );
+            }
+            for ( auto m : db.matches )
+            {
+                int index0 = m.image_id1-1;
+                int index1 = m.image_id2-1;
+                Matches matches;
+                for ( auto mm : m.matches )
+                {
+                    matches[mm.first] = mm.second;
+                }
+                Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
+                ImageMatch im( index0, index1, matches, R );
+                all_image_matches.push_back(im);
+            }
+        } else {
+            cv::VideoCapture cap(FLAGS_images);
+            cv::Mat image0_in;
+            if ( !cap.read(image0_in) )
+            {
+                std::cout << "error: could not read single frame from " << FLAGS_images << "\n";
+                exit(1);
+            }
+            width = image0_in.cols;
+            height = image0_in.rows;
+    
+            std::cout << "extract features from images: " << FLAGS_images << "\n";
+            detect_features( FLAGS_images, keyframes );
+            std::cout << "matching images\n";
+            match_exhaustive( keyframes, all_image_matches );
+        }
 
-        detect_features( FLAGS_images, keyframes );
-        std::cout << "matching images\n";
-        int loop_closure_count = match_exhaustive( intrinsics_guess, keyframes, image_matches,
-                            FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_inward );
+        focal_guess = (width+height)/2;
+        centerx = width/2;
+        centery = height/2;
+        std::cout << "initial focal: " << focal_guess << "\n";
+        Intrinsics intrinsics_guess(focal_guess,centerx,centery);
+        int loop_closure_count = estimate_pairwise( intrinsics_guess, keyframes, all_image_matches,
+                            FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_inward, image_matches );
         if ( loop_closure_count == 0 ) 
         {
             std::cout << "error: no matches found\n";
@@ -74,7 +112,23 @@ int main( int argc, char **argv )
     }
     else
     {
-        read_images( FLAGS_images, keyframes );
+        if ( FLAGS_colmap )
+        {
+            COLMAP::Database db( FLAGS_output + "/database.db" );
+            int index = 0;
+            for ( auto it : db.images )
+            {
+                cv::Mat image = cv::imread(FLAGS_images + "/" + it.second.name);
+                if ( image.channels() == 3 ) cv::cvtColor( image, keyframes[index].image, cv::COLOR_BGR2GRAY );
+                else image.copyTo(keyframes[index].image);
+                index++;
+            }
+        } else {
+            read_images( FLAGS_images, keyframes );
+        }
+        width = keyframes[0].image.cols;
+        height = keyframes[0].image.rows;
+        focal_guess = (width+height)/2;
     }
     
     const double min_focal = focal_guess/4;

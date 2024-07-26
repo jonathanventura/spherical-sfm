@@ -3,6 +3,21 @@ find_package(gflags REQUIRED)
 find_package(Boost REQUIRED)
 find_package(GSL REQUIRED)
 
+find_package( SQLite3 REQUIRED )
+include_directories( ${SQLite3_INCLUDE_DIRS} )
+
+find_package(Gopt REQUIRED)
+if(GOPT_FOUND)
+  message(STATUS "Found GOPT_INCLUDE_DIRs ${GOPT_INCLUDE_DIRS}")
+  message(STATUS "Found GOPT_LINK_DIRs ${GOPT_LINK_DIRS}")
+  message(STATUS "Found GOPT_LIBRARIES ${GOPT_LIBRARIES}")
+else(GOPT_FOUND)
+  message(FATAL "GOPT not found!")
+endif(GOPT_FOUND)
+
+include_directories(${GOPT_INCLUDE_DIRS})
+link_directories(${GOPT_LINK_DIRS})
+
 add_executable( undistort_images
     undistort_images.cpp
 )
@@ -16,12 +31,14 @@ add_executable( run_spherical_sfm
 target_link_libraries( run_spherical_sfm sphericalsfm )
 target_link_libraries( run_spherical_sfm ${OpenCV_LIBS} gflags )
 target_link_libraries( run_spherical_sfm GSL::gsl )
+target_link_libraries( run_spherical_sfm ${GOPT_LIBRARIES} )
 if ( OpenMP_FOUND )
     target_link_libraries( run_spherical_sfm OpenMP::OpenMP_CXX )
 endif()
 #target_compile_features( run_spherical_sfm PRIVATE cxx_alias_templates )
 
 add_executable( run_spherical_sfm_uncalib
+    colmap.h colmap.cpp
     spherical_sfm_tools.h spherical_sfm_tools.cpp
     spherical_sfm_io.h spherical_sfm_io.cpp
     run_spherical_sfm_uncalib.cpp
@@ -29,6 +46,8 @@ add_executable( run_spherical_sfm_uncalib
 target_link_libraries( run_spherical_sfm_uncalib sphericalsfm )
 target_link_libraries( run_spherical_sfm_uncalib ${OpenCV_LIBS} gflags )
 target_link_libraries( run_spherical_sfm_uncalib GSL::gsl )
+target_link_libraries( run_spherical_sfm_uncalib ${GOPT_LIBRARIES} )
+target_link_libraries( run_spherical_sfm_uncalib ${SQLite3_LIBRARIES} )
 if ( OpenMP_FOUND )
     target_link_libraries( run_spherical_sfm_uncalib OpenMP::OpenMP_CXX )
 endif()
