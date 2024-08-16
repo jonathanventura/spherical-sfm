@@ -14,7 +14,7 @@ namespace sphericalsfmtools {
         fprintf(keyframesf,"%d\n",keyframes.size());
         for ( int i = 0; i < keyframes.size(); i++ )
         {
-            fprintf(keyframesf,"%d\n",keyframes[i].index);
+            fprintf(keyframesf,"%d %s\n",keyframes[i].index,keyframes[i].name);
         }
         fclose(keyframesf);
 
@@ -68,7 +68,7 @@ namespace sphericalsfmtools {
         std::vector<int> indices(nkeyframes);
         for ( int i = 0; i < nkeyframes; i++ )
         {
-            fscanf(keyframesf,"%d\n",&indices[i]);
+            fscanf(keyframesf,"%d ",&indices[i]);
         }
         fclose(keyframesf);
         std::cout << "read " << indices.size() << " indices\n";
@@ -90,7 +90,9 @@ namespace sphericalsfmtools {
                 features.points.push_back(cv::Point2f(x,y));
                 features.descs.push_back(descriptor);
             }
-            keyframes.push_back(Keyframe(indices[i],features));
+            char name[1024];
+            sprintf(name,"%06d.jpg",indices[i]+1);
+            keyframes.push_back(Keyframe(indices[i],name,features));
         }
         fclose(featuresf);
 

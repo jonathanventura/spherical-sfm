@@ -27,10 +27,11 @@ namespace sphericalsfmtools {
     struct Keyframe
     {
         int index;
+        std::string name;
         Features features;
         cv::Mat image;
-        Keyframe( const int _index, const Features &_features ) :
-        index(_index), features(_features) { }
+        Keyframe( const int _index, const std::string &_name, const Features &_features ) :
+        index(_index), name(_name), features(_features) { }
     };
 
     struct ImageMatch
@@ -70,6 +71,8 @@ namespace sphericalsfmtools {
                               const double inlier_threshold, const double min_rot,
                               const bool inward = false );
 
+    void find_largest_connected_component( std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches );
+
     int make_loop_closures( const sphericalsfm::Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
                             const double inlier_threshold, const int min_num_inliers, const int num_frames_begin, const int num_frames_end, const bool best_only,
                             const bool inward = false );
@@ -101,6 +104,16 @@ namespace sphericalsfmtools {
                                  double min_focal,
                                  double max_focal,
                                  int num_steps,
+                                 std::vector<Eigen::Matrix3d> &rotations,
+                                 double &best_focal );
+    bool find_best_focal_length_random( int num_cameras,
+                                 std::vector<ImageMatch> &image_matches,
+                                 bool inward,
+                                 bool sequential,
+                                 double focal_guess,
+                                 double min_focal,
+                                 double max_focal,
+                                 int num_trials,
                                  std::vector<Eigen::Matrix3d> &rotations,
                                  double &best_focal );
 }

@@ -42,7 +42,7 @@ int main( int argc, char **argv )
     
     std::vector<Keyframe> keyframes;
     std::vector<ImageMatch> image_matches;
-    if ( !read_feature_tracks( FLAGS_output, keyframes, image_matches ) )
+    if ( true ) //!read_feature_tracks( FLAGS_output, keyframes, image_matches ) )
     {
         std::cout << "tracking features in images: " << FLAGS_images << "\n";
 

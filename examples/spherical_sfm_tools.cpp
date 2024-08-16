@@ -28,7 +28,10 @@
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_min.h>
 
-#include<gopt/graph/view_graph.h>
+#include <gopt/graph/view_graph.h>
+
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/connected_components.hpp>
 
 
 using namespace sphericalsfm;
@@ -254,6 +257,7 @@ namespace sphericalsfmtools {
         }
     }
 
+    /*
     void build_feature_tracks( const Intrinsics &intrinsics, const std::string &videopath,
                               std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
                               const double inlier_threshold, const double min_rot,
@@ -312,11 +316,9 @@ namespace sphericalsfmtools {
             match( features0, features1, m01 );
             std::cout << "tracked " << features1.size() << " features in image " << video_index << "\n";
                 
-            /*
-            cv::Mat matchesim;
-            drawmatches( image0, image1, features0, features1, m01, matchesim );
-            cv::imwrite( "matches" + std::to_string(video_index) + ".png", matchesim );
-            */
+            //cv::Mat matchesim;
+            //drawmatches( image0, image1, features0, features1, m01, matchesim );
+            //cv::imwrite( "matches" + std::to_string(video_index) + ".png", matchesim );
 
             std::vector<bool> inliers;
             int ninliers;
@@ -373,11 +375,9 @@ namespace sphericalsfmtools {
             {
                 if ( inliers[i++] ) m01inliers[it->first] = it->second;
             }
-            /*
-            cv::Mat inliersim;
-            drawmatches( image0, image1, features0, features1, m01inliers, inliersim );
-            cv::imwrite( "inliers" + std::to_string(video_index) + ".png", inliersim );
-            */
+            //cv::Mat inliersim;
+            //drawmatches( image0, image1, features0, features1, m01inliers, inliersim );
+            //cv::imwrite( "inliers" + std::to_string(video_index) + ".png", inliersim );
             
             image1.copyTo(image0);
             features0 = features1;
@@ -392,6 +392,7 @@ namespace sphericalsfmtools {
             kf_index++;
         }
     }
+    */
 
     void detect_features( const std::string &videopath, std::vector<Keyframe> &keyframes )
     {
@@ -404,7 +405,7 @@ namespace sphericalsfmtools {
             if ( image_in.channels() == 3 ) cv::cvtColor( image_in, image, cv::COLOR_BGR2GRAY );
             else image = image_in;
             Features features;
-            keyframes.push_back(Keyframe(i,features));
+            keyframes.push_back(Keyframe(i,"",features));
             image.copyTo(keyframes[keyframes.size()-1].image);
             i++;
         }
@@ -421,7 +422,7 @@ namespace sphericalsfmtools {
             Keyframe &keyframe = keyframes[i];
             DetectorTracker detector;
             detector.detect( keyframe.image, keyframe.features );
-            std::cout << "image " << i << " has " << keyframe.features.size() << " features\n";
+            //std::cout << "image " << i << " has " << keyframe.features.size() << " features\n";
         }
     }
     
@@ -510,8 +511,8 @@ namespace sphericalsfmtools {
                     inliers[i] = ( estimator.EvaluateModelOnPoint(E,i) < options.squared_inlier_threshold_ );
                 }
             }
-            fprintf( stdout, "%d %d: %lu matches and %d inliers (%0.2f%%)\n",
-                     keyframes[index0].index, keyframes[index1].index, m01.size(), ninliers, (double)ninliers/(double)m01.size()*100 );
+            //fprintf( stdout, "%d %d: %lu matches and %d inliers (%0.2f%%)\n",
+                     //keyframes[index0].index, keyframes[index1].index, m01.size(), ninliers, (double)ninliers/(double)m01.size()*100 );
 
             Matches m01inliers;
             size_t j = 0;
@@ -565,6 +566,7 @@ namespace sphericalsfmtools {
 #pragma omp parallel for
         for ( int i = 0; i < image_matches.size(); i++ ) 
         {
+            //if ( i % 10 == 0 ) std::cout << i+1 << " / " << image_matches.size() << "\n";
             ImageMatch &image_match = image_matches[i];
             int index0 = image_match.index0;
             int index1 = image_match.index1;
@@ -708,6 +710,64 @@ namespace sphericalsfmtools {
         }
         return loop_closure_count;
     }
+    
+    void find_largest_connected_component( std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches )
+    {
+        using namespace boost;
+        {
+            typedef adjacency_list <vecS, vecS, undirectedS> Graph;
+
+            Graph G;
+            for ( auto im : image_matches )
+            {
+                add_edge( im.index0, im.index1, G );
+            }
+    
+            std::vector<int> component(num_vertices(G));
+            int num = connected_components(G, &component[0]);
+    
+            std::vector<int> sizes(num);
+            for ( int i = 0; i < num; i++ ) sizes[i] = 0;
+            for ( int i = 0; i < num_vertices(G); i++ ) sizes[component[i]]++;
+            for ( int i = 0; i < num; i++ ) std::cout << "component " << i << " has " << sizes[i] << "\n";
+            
+            int best_size = sizes[0];
+            int best_index = 0;
+            for ( int i = 1; i < num; i++ ) 
+            {
+                if ( sizes[i] > best_size )
+                {
+                    best_index = i;
+                    best_size = sizes[i];
+                }
+            }
+            
+            std::cout << "largest connected component has " << best_size << " vertices\n";
+            
+            std::map<int,int> old2new;
+            std::vector<Keyframe> new_keyframes;
+            std::vector<ImageMatch> new_image_matches;
+            for ( int i = 0; i < keyframes.size(); i++ )
+            {
+                if ( component[i] == best_index )
+                {
+                    old2new[i] = new_keyframes.size();
+                    new_keyframes.push_back(keyframes[i]);
+                }
+            }
+            for ( int i = 0; i < image_matches.size(); i++ )
+            {
+                if ( component[image_matches[i].index0] == best_index && component[image_matches[i].index1] == best_index )
+                {
+                    image_matches[i].index0 = old2new[image_matches[i].index0];
+                    image_matches[i].index1 = old2new[image_matches[i].index1];
+                    new_image_matches.push_back(image_matches[i]);
+                }
+            }
+            keyframes = new_keyframes;
+            image_matches = new_image_matches;
+        }
+    }
 
     void initialize_rotations_sequential( const int num_cameras, const std::vector<ImageMatch> &image_matches, std::vector<Eigen::Matrix3d> &rotations )
     {
@@ -792,11 +852,9 @@ namespace sphericalsfmtools {
         std::cout << "adding cameras\n";
         for ( int index = 0; index < keyframes.size(); index++ )
         {
-            char path[1024];
-            sprintf(path,"%06d.png",keyframes[index].index+1);
             Eigen::Vector3d t(0,0,-1);
             if ( inward ) t[2] = 1;
-            int camera = sfm.AddCamera( Pose( t, so3ln(rotations[index]) ), path );
+            int camera = sfm.AddCamera( Pose( t, so3ln(rotations[index]) ), keyframes[index].name );
             sfm.SetRotationFixed( camera, (index==fix_camera) );
             sfm.SetTranslationFixed( camera, spherical ? true : (index==fix_camera) );
         }
@@ -1033,34 +1091,45 @@ namespace sphericalsfmtools {
         return cost;
     }
 
-    static double loop_constraint_cost_fn( double focal, void * params )
+    static void transform_image_matches( double focal, const FocalLengthSearchParams *search_params, std::vector<ImageMatch> &image_matches_new )
     {
-        FocalLengthSearchParams *search_params = (FocalLengthSearchParams *)params;
-
-        std::vector<ImageMatch> image_matches_new(search_params->image_matches);
+        image_matches_new.clear();
 
         Eigen::Vector3d T(focal/search_params->focal_guess,focal/search_params->focal_guess,1);
         for ( int i = 0; i < search_params->image_matches.size(); i++ )
         {
+            ImageMatch &im = search_params->image_matches[i];
             Eigen::Matrix3d E_new = T.asDiagonal() * search_params->Es[i] * T.asDiagonal();
             Eigen::Vector3d r_new, t_new;
             decompose_spherical_essential_matrix( E_new, search_params->inward, r_new, t_new );
-            image_matches_new[i].R = so3exp(r_new);
+            image_matches_new.push_back(ImageMatch(im.index0,im.index1,im.matches,so3exp(r_new)));
         }
-
-        if ( search_params->sequential ) {
-            initialize_rotations_sequential( search_params->num_cameras, image_matches_new, search_params->rotations );
+    }
+    
+    static void initialize_rotations( int num_cameras, const std::vector<ImageMatch> &image_matches, bool sequential, std::vector<Eigen::Matrix3d> &rotations )
+    {
+        if ( sequential ) {
+            initialize_rotations_sequential( num_cameras, image_matches, rotations );
         } else {
-            //image_matches_new = filter_image_matches( image_matches_new, 5.*M_PI/180. );
-            initialize_rotations_gopt( search_params->num_cameras, image_matches_new, search_params->rotations );
+            initialize_rotations_gopt( num_cameras, image_matches, rotations );
         }
+    }
+
+    static double loop_constraint_cost_fn( double focal, void * params )
+    {
+        const FocalLengthSearchParams *search_params = (FocalLengthSearchParams *)params;
+        std::vector<ImageMatch> image_matches_new;
+        std::vector<Eigen::Matrix3d> rotations;
+
+        transform_image_matches( focal, search_params, image_matches_new );
+        initialize_rotations( search_params->num_cameras, image_matches_new, search_params->sequential, rotations );
 
         std::vector<RelativeRotation> relative_rotations;
         for ( int i = 0; i < image_matches_new.size(); i++ )
         {
             relative_rotations.push_back( RelativeRotation( image_matches_new[i].index0, image_matches_new[i].index1, image_matches_new[i].R ) );
         }
-        double cost = get_cost(search_params->rotations, relative_rotations );
+        double cost = get_cost(rotations, relative_rotations );
 
         return cost;
     }
@@ -1313,6 +1382,79 @@ namespace sphericalsfmtools {
         }
         
         return found_one;
+    }
+
+    bool find_best_focal_length_random( int num_cameras,
+                                 std::vector<ImageMatch> &image_matches,
+                                 bool inward,
+                                 bool sequential,
+                                 double focal_guess,
+                                 double min_focal,
+                                 double max_focal,
+                                 int num_trials,
+                                 std::vector<Eigen::Matrix3d> &rotations,
+                                 double &best_focal )
+    {
+        std::vector<Eigen::Matrix3d> Es(image_matches.size());
+        for ( int i = 0; i < image_matches.size(); i++ )
+        {
+            make_spherical_essential_matrix(image_matches[i].R,inward,Es[i]);
+        }
+        std::vector<RelativeRotation> relative_rotations;
+        for ( int i = 0; i < image_matches.size(); i++ )
+        {
+            relative_rotations.push_back( RelativeRotation( image_matches[i].index0, image_matches[i].index1, image_matches[i].R ) );
+        }
+
+        FocalLengthSearchParams params(
+            num_cameras,
+            Es,
+            image_matches,
+            inward,
+            sequential,
+            focal_guess );
+        
+        double best_cost = INFINITY;
+        best_focal = focal_guess;
+    
+        double min_good_focal = INFINITY;
+        double max_good_focal = 0;
+        
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution dist(min_focal,max_focal);
+
+        std::vector<double> focals(num_trials);
+        std::vector<double> costs(num_trials);
+#pragma omp parallel for
+        for ( int trial = 0; trial < num_trials; trial++ )
+        {
+            double focal = dist(gen);
+            double cost = loop_constraint_cost_fn( focal, &params );
+            focals[trial] = focal;
+            costs[trial] = cost;
+        }
+        for ( int trial = 0; trial < num_trials; trial++ )
+        {
+            if ( costs[trial] < best_cost ) 
+            {
+                best_cost = costs[trial];
+                best_focal = focals[trial];
+            }
+        }
+
+        std::vector<ImageMatch> image_matches_new;
+
+        transform_image_matches( best_focal, &params, image_matches_new );
+        initialize_rotations( num_cameras, image_matches_new, sequential, rotations );
+         
+        std::cout << "before optimization: " << best_focal << "\n";
+        params.rotations = rotations;
+        run_optimization( best_focal, &params, min_focal, max_focal );
+        rotations = params.rotations;
+        std::cout << "after optimization: " << best_focal << "\n";
+        
+        return true;
     }
 
 }
