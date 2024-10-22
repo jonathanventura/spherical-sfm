@@ -88,3 +88,4 @@ RUN wget https://github.com/colmap/colmap/archive/refs/tags/3.9.1.zip && \
     make -j8 && \
     make install
 
+RUN apt-get install python3-pip -y
