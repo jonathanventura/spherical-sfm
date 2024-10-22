@@ -38,6 +38,12 @@ using namespace sphericalsfm;
 
 namespace sphericalsfmtools {
 
+    cv::Vec3b sample_image(const cv::Mat& img, cv::Point2f pt)
+    {
+        cv::Mat patch;
+        cv::getRectSubPix(img, cv::Size(1,1), pt, patch);
+        return patch.at<cv::Vec3b>(0,0);
+    }
     // from https://github.com/BAILOOL/ANMS-Codes/blob/master/C%2B%2B/QtProject/anms.h
     struct sort_pred {
         bool operator()(const std::pair<float,int> &left, const std::pair<float,int> &right) {
@@ -895,7 +901,7 @@ namespace sphericalsfmtools {
                 }
                 else if ( track0 == -1 && track1 == -1 )
                 {
-                    track0 = track1 = sfm.AddPoint( Eigen::Vector3d::Zero(), features0.descs.row(it->first) );
+                    track0 = track1 = sfm.AddPoint( Eigen::Vector3d::Zero(), features0.descs.row(it->first), features0.colors[it->first] );
 
                     sfm.SetPointFixed( track0, false );
                     

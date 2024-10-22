@@ -28,7 +28,8 @@ namespace sphericalsfm {
         
         SparseVector<std::string> paths;       // indexed by camera index
         SparseVector<cv::Mat> descriptors;     // indexed by point index
-        
+        SparseVector<cv::Vec3b> colors;        // indexed by point index
+
         bool focalFixed;
         SparseVector<bool> rotationFixed;
         SparseVector<bool> translationFixed;
@@ -56,7 +57,7 @@ namespace sphericalsfm {
         Intrinsics GetIntrinsics() const { return intrinsics; }
         
         int AddCamera( const Pose &initial_pose, const std::string &path = "" );
-        int AddPoint( const Point &initial_position, const cv::Mat &descriptor = cv::Mat() );
+        int AddPoint( const Point &initial_position, const cv::Mat &descriptor = cv::Mat(), const cv::Vec3b &color = cv::Vec3b(0,0,0) );
         void AddObservation( int camera, int point, const Observation &observation );
 
         void RemoveCamera( int camera );
@@ -85,6 +86,8 @@ namespace sphericalsfm {
         Point GetPoint( int point );
         void SetPoint( int point, const Point &position );
         
+        cv::Vec3b GetColor( int point );
+
         void SetFocalFixed( bool fixed ) { focalFixed = fixed; }
         void SetRotationFixed( int camera, bool fixed ) { rotationFixed[camera] = fixed; }
         void SetTranslationFixed( int camera, bool fixed ) { translationFixed[camera] = fixed; }

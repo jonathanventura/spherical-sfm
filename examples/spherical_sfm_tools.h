@@ -14,10 +14,13 @@ namespace sphericalsfmtools {
     typedef std::pair<size_t,size_t> Match;
     typedef std::map<size_t,size_t> Matches;
 
+    cv::Vec3b sample_image(const cv::Mat& img, cv::Point2f pt);
+
     struct Features
     {
         std::vector<int> tracks;
         std::vector<cv::Point2f> points;
+        std::vector<cv::Vec3b> colors;
         cv::Mat descs;
         Features() : descs(0,128,CV_32F) { }
         int size() const { return points.size(); }

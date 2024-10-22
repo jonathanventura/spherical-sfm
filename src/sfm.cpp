@@ -110,7 +110,7 @@ namespace sphericalsfm {
         return nextCamera;
     }
 
-    int SfM::AddPoint( const Point &initial_position, const cv::Mat &descriptor )
+    int SfM::AddPoint( const Point &initial_position, const cv::Mat &descriptor, const cv::Vec3b &color )
     {
         numPoints++;
         
@@ -120,6 +120,8 @@ namespace sphericalsfm {
         cv::Mat descriptor_copy;
         descriptor.copyTo( descriptor_copy );
         descriptors( nextPoint ) = descriptor_copy;
+
+        colors( nextPoint ) = color;
 
         return nextPoint++;
     }
@@ -425,6 +427,12 @@ namespace sphericalsfm {
         points( point ) = position;
     }
 
+    cv::Vec3b SfM::GetColor( int point )
+    {
+        if ( !colors.exists( point ) ) return cv::Vec3b(0,0,0);
+        return colors( point );
+    }
+
     void SfM::RemovePoint( int point )
     {
         for ( int i = 0; i < numCameras; i++ )
@@ -433,6 +441,7 @@ namespace sphericalsfm {
         }
         points.erase( point );
         descriptors.erase( point );
+        colors.erase( point );
     }
 
     void SfM::RemoveCamera( int camera )
@@ -622,10 +631,11 @@ namespace sphericalsfm {
         for ( int j = 0; j < GetNumPoints(); j++ )
         {
             Eigen::Vector3d point = GetPoint(j);
+            cv::Vec3b color = GetColor(j);
             if ( point.norm() == 0 ) continue;
             fprintf(pointsf,"%d ",j+1);
             fprintf(pointsf,"%lf %lf %lf ",point(0),point(1),point(2));
-            fprintf(pointsf,"0 0 0 "); // RGB
+            fprintf(pointsf,"%d %d %d ",color(2),color(1),color(0)); // RGB
             fprintf(pointsf,"0 "); // error
             for ( int k = 0; k < point_obs[j].size(); k++ )
             {

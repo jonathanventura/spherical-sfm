@@ -48,17 +48,21 @@ int main( int argc, char **argv )
         for ( auto it : db.images )
         {
             std::cout << it.second.name << "\n";
+            cv::Mat image = cv::imread(FLAGS_images + "/" + it.second.name);
             if ( index == 0 )
             {
-                cv::Mat image = cv::imread(FLAGS_images + "/" + it.second.name);
                 width = image.cols;
                 height = image.rows;
+            } else {
+                assert( ( width == image.cols ) && ( height == image.rows ) );
             }
             Features features;
             for ( auto kp : it.second.keypoints )
             {
-                features.points.push_back( cv::Point2f( kp.x(0), kp.x(1) ) );
+                cv::Point2f pt( kp.x(0), kp.x(1) );
+                features.points.push_back( pt );
                 features.descs.push_back( cv::Mat::zeros(1,128,CV_32F) );
+                features.colors.push_back( sample_image( image, pt ) );
             }
             Keyframe kf( index++, it.second.name, features );
             keyframes.push_back( kf );
