@@ -119,6 +119,6 @@ if __name__ == '__main__':
     res_dict['focal'] = np.mean(fError) * 100
     
     df = pd.Series(res_dict)
-    print(df)
+    print(df.round(2))
     
 

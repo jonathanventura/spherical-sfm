@@ -326,6 +326,25 @@ def read_cameras_from_sparse(sparse_path):
         cameras_info.append(cam_info)
     return cameras_info
 
+def read_cameras_from_sparse_np(sparse_path):
+    cameras, images, points3D = read_model(sparse_path)
+    cameras_info = []
+    for image in images.values():
+        cam_info = {}
+        camera = cameras[1]
+        cam_info['img_name'] = image.name
+
+        cam_info['intrinsics'] = camera.params
+        cam_info['H'] = camera.height
+        cam_info['W'] = camera.width
+
+        w2c = np.eye(4)
+        w2c[:3, :3] = qvec2rotmat(image.qvec)
+        w2c[:3, 3] = image.tvec
+        cam_info['w2c'] = w2c
+        cameras_info.append(cam_info)
+    return cameras_info
+
 if __name__ == '__main__':
     #main()
     sparse_path = 'data_colmap/sparse'
