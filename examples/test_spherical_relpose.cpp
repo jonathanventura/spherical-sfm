@@ -1,7 +1,10 @@
 #include <Eigen/Dense>
 #include <sphericalsfm/so3.h>
 #include <sphericalsfm/spherical_solvers.h>
+#include <sphericalsfm/spherical_utils.h>
 #include <PoseLib/solvers/relpose_5pt.h>
+#include <opengv/relative_pose/CentralRelativeAdapter.hpp>
+#include <opengv/relative_pose/methods.hpp>
 #include <numeric>
 #include <iostream>
 
@@ -27,7 +30,8 @@ struct Rigid3d {
 
 bool make_random_problem( double angle, double noise,
     std::vector<Eigen::Vector2d> &x1, std::vector<Eigen::Vector2d> &x2,
-    Eigen::Matrix3d &R, Eigen::Vector3d &t )
+    Eigen::Matrix3d &R, Eigen::Vector3d &t,
+    int num_observations = 15 )
 {
     // make random spherical relative pose problem
     // with specified relative rotation
@@ -38,16 +42,20 @@ bool make_random_problem( double angle, double noise,
     // R = sphericalsfm::so3exp(Eigen::Vector3d::Random());
     // t = Eigen::Vector3d::Random();
 
-    x1.resize(6);
-    x2.resize(6);
+    x1.resize(num_observations);
+    x2.resize(num_observations);
 
-    for ( int i = 0; i < 6; i++ )
+    for ( int i = 0; i < num_observations; i++ )
     {
         // make random 2D point in first image
         x1[i] = Eigen::Vector2d::Random();
 
-        // make random depth from 4 to 8
-        double depth = Eigen::Matrix<double,1,1>::Random()(0,0)*2+6;
+        // make random depth
+        // double depth = Eigen::Matrix<double,1,1>::Random()(0,0)*2+4;
+        // double depth = Eigen::Matrix<double,1,1>::Random()(0,0)*0.5+1;
+        // double depth = Eigen::Matrix<double,1,1>::Random()(0,0)*1+11;
+        double depth = Eigen::Matrix<double,1,1>::Random()(0,0)*9.5+10.5;
+        if ( depth < 0 ) return false;
 
         // get 3D point
         Eigen::Vector3d X = depth * x1[i].homogeneous();
@@ -214,29 +222,17 @@ void PoseFromEssentialMatrix(const Eigen::Matrix3d& E,
   }
 }
 
-bool compute_fivept( const std::vector<Eigen::Vector2d> &x1,
-                     const std::vector<Eigen::Vector2d> &x2,
-                     Eigen::Matrix3d &R, Eigen::Vector3d &t )
+Eigen::Matrix3d choose_best_Esoln( const std::vector<Eigen::Vector2d> &x1,
+                                   const std::vector<Eigen::Vector2d> &x2,
+                                   const std::vector<Eigen::Matrix3d> Es )
 {
-    std::vector<Eigen::Vector3d> x1h(5);
-    std::vector<Eigen::Vector3d> x2h(5);
-    for ( int i = 0; i < 5; i++ ) {
-        x1h[i] = x1[i].homogeneous();
-        x2h[i] = x2[i].homogeneous();
-    }
-
-    // compute essential matrix solutions from five pt solver
-    std::vector<Eigen::Matrix3d> essential_matrices;
-    int nsols = poselib::relpose_5pt(x1h, x2h, &essential_matrices);
-    if ( !nsols ) return false;
-
     // compute sampson error for each solution
     int best_sol = 0;
     double best_score = INFINITY;
-    for ( int i = 0; i < nsols; i++ )
+    for ( int i = 0; i < Es.size(); i++ )
     {
         std::vector<double> residuals;
-        ComputeSquaredSampsonError(x1, x2, essential_matrices[i], &residuals);
+        ComputeSquaredSampsonError(x1, x2, Es[i], &residuals);
         double score = std::accumulate(residuals.begin(),residuals.end(),0.);
         if ( score < best_score )
         {
@@ -245,7 +241,28 @@ bool compute_fivept( const std::vector<Eigen::Vector2d> &x1,
         }
     }
 
-    Eigen::Matrix3d E = essential_matrices[best_sol];
+    return Es[best_sol];
+}
+
+bool compute_nister( const std::vector<Eigen::Vector2d> &x1,
+                     const std::vector<Eigen::Vector2d> &x2,
+                     std::vector<Eigen::Matrix3d> &Es,
+                     Eigen::Matrix3d &R, Eigen::Vector3d &t )
+{
+    std::vector<Eigen::Vector3d> x1h(5);
+    std::vector<Eigen::Vector3d> x2h(5);
+    for ( int i = 0; i < 5; i++ ) {
+        x1h[i] = x1[i].homogeneous();
+        x2h[i] = x2[i].homogeneous();
+        x1h[i] /= x1h[i].norm();
+        x2h[i] /= x2h[i].norm();
+    }
+
+    // compute essential matrix solutions from five pt solver
+    int nsols = poselib::relpose_5pt(x1h, x2h, &Es);
+    if ( !nsols ) return false;
+
+    Eigen::Matrix3d E = choose_best_Esoln(x1,x2,Es);
 
     Rigid3d cam2_from_cam1;
     std::vector<Eigen::Vector3d> points3D;
@@ -257,13 +274,85 @@ bool compute_fivept( const std::vector<Eigen::Vector2d> &x1,
     return true;
 }
 
-void compute_threept( Eigen::Vector2d x[5], Eigen::Vector2d y[5],
-                     Eigen::Matrix3d R, Eigen::Vector3d t )
+bool compute_stewenius( const std::vector<Eigen::Vector2d> &x1,
+                        const std::vector<Eigen::Vector2d> &x2,
+                        std::vector<Eigen::Matrix3d> &Es,
+                        Eigen::Matrix3d &R, Eigen::Vector3d &t )
 {
-    
+    opengv::bearingVectors_t x1h(5);
+    opengv::bearingVectors_t x2h(5);
+    for ( int i = 0; i < 5; i++ ) {
+        x1h[i] = x1[i].homogeneous();
+        x2h[i] = x2[i].homogeneous();
+        x1h[i] /= x1h[i].norm();
+        x2h[i] /= x2h[i].norm();
+    }
+    opengv::relative_pose::CentralRelativeAdapter adapter( x1h, x2h );
+
+
+
+    opengv::complexEssentials_t fivept_stewenius_essentials = opengv::relative_pose::fivept_stewenius( adapter );
+
+
+    if ( fivept_stewenius_essentials.empty() ) return false;
+    Es.resize(fivept_stewenius_essentials.size());
+    for ( int i = 0; i < fivept_stewenius_essentials.size(); i++ ) {
+        Es[i] = fivept_stewenius_essentials[i].real().transpose();
+    }
+    Eigen::Matrix3d E = choose_best_Esoln(x1,x2,Es);
+
+    Rigid3d cam2_from_cam1;
+    std::vector<Eigen::Vector3d> points3D;
+    PoseFromEssentialMatrix(E, x1, x2, &cam2_from_cam1, &points3D);
+
+    R = cam2_from_cam1.rotation.toRotationMatrix();
+    t = cam2_from_cam1.translation;
+
+    return true;
 }
 
-double compute_error( const Eigen::Vector3d &t1, const Eigen::Vector3d &t2 )
+bool compute_threept( const std::vector<Eigen::Vector2d> &x1,
+                      const std::vector<Eigen::Vector2d> &x2,
+                      std::vector<Eigen::Matrix3d> &Es,
+                      Eigen::Matrix3d &R, Eigen::Vector3d &t )
+{
+    sphericalsfm::RayPairList correspondences(3);
+    std::vector<int> sample(3);
+    for ( int i = 0; i < 3; i++ )
+    {
+        correspondences[i].first = x1[i].homogeneous();
+        correspondences[i].second = x2[i].homogeneous();
+        correspondences[i].first /= correspondences[i].first.norm();
+        correspondences[i].second /= correspondences[i].second.norm();
+        sample[i] = i;
+    }
+    int nsols = sphericalsfm::spherical_solver_action_matrix(correspondences,sample,&Es);
+    if ( !nsols ) return false;
+
+    Eigen::Matrix3d E = choose_best_Esoln(x1,x2,Es);
+    Eigen::Vector3d r;
+    sphericalsfm::decompose_spherical_essential_matrix( E, false, r, t );
+    R = sphericalsfm::so3exp(r);
+    return true;
+}
+
+Eigen::Matrix3d normalize_E( const Eigen::Matrix3d &E )
+{
+    Eigen::Map<const Eigen::Matrix<double,9,1> > v(E.data());
+    return E / v.norm();
+}
+
+double compute_essential_error( const Eigen::Matrix3d &E1, const Eigen::Matrix3d &E2 )
+{
+    return (normalize_E(E1)-normalize_E(E2)).norm();
+}
+
+double compute_rot_error( const Eigen::Matrix3d &R1, const Eigen::Matrix3d &R2 )
+{
+    return sphericalsfm::so3ln(R1*R2.transpose()).norm();
+}
+
+double compute_trans_error( const Eigen::Vector3d &t1, const Eigen::Vector3d &t2 )
 {
     double err = t1.dot(t2)/t1.norm()/t2.norm();
     return acos(std::min(std::max(err,-1.0),1.0)); 
@@ -271,42 +360,86 @@ double compute_error( const Eigen::Vector3d &t1, const Eigen::Vector3d &t2 )
 
 int main( int argc, char **argv )
 {
-    for ( int iter = 0; iter < 1000; iter++ )
+    double focal = 600;
+    FILE *f = fopen("results.csv","w");
+    fprintf(f,"angle,noise,E_err,R_err,t_err,method\n");
+    // for ( int iangle = 1; iangle > 0; iangle-- )
+    int iangle = 1;
+    double angle = 1;
+    for ( int inoise = 0; inoise <= 10; inoise++ )
     {
-        // std::cout << "**** iteration " << iter << " **** \n";
+        // double angle = iangle*M_PI/180./10;
+        for ( int iter = 0; iter < 1000; iter++ )
+        {
+            // std::cout << "**** iteration " << iter << " **** \n";
 
-        double angle = 10.*M_PI/180., noise = 1/400;
+            // double noise = 0;
+            double noise = inoise/focal;
 
-        std::vector<Eigen::Vector2d> x1;
-        std::vector<Eigen::Vector2d> x2;
-        Eigen::Matrix3d R;
-        Eigen::Vector3d t;
+            std::vector<Eigen::Vector2d> x1;
+            std::vector<Eigen::Vector2d> x2;
+            Eigen::Matrix3d R;
+            Eigen::Vector3d t;
 
-        // make data
-        while ( !make_random_problem(angle, noise, x1, x2, R, t) ) ;
-        Eigen::Vector3d c = -R.transpose() * t;
-        Eigen::Matrix3d E = sphericalsfm::skew3(t)*R;
+            // make data
+            while ( !make_random_problem(angle, noise, x1, x2, R, t) ) ;
+            Eigen::Vector3d c = -R.transpose() * t;
+            Eigen::Matrix3d E = sphericalsfm::skew3(t)*R;
 
-        // std::cout << "R:\n" << R << "\n";
-        // std::cout << "t:\n" << t << "\n";
+            // std::cout << "R:\n" << R << "\n";
+            // std::cout << "t:\n" << t << "\n";
 
-        // compute five-point relative pose
-        Eigen::Matrix3d R_fivept;
-        Eigen::Vector3d t_fivept;
-        if ( !compute_fivept(x1, x2, R_fivept, t_fivept ) ) continue;
-        Eigen::Matrix3d E_fivept = sphericalsfm::skew3(t_fivept)*R_fivept;
-        Eigen::Vector3d c_fivept = -R_fivept.transpose() * t_fivept;
+            // compute nister five-point relative pose
+            Eigen::Matrix3d R_nister;
+            Eigen::Vector3d t_nister;
+            std::vector<Eigen::Matrix3d> Es_nister;
+            if ( !compute_nister(x1, x2, Es_nister, R_nister, t_nister ) ) continue;
+            Eigen::Matrix3d E_nister = sphericalsfm::skew3(t_nister)*R_nister;
+            Eigen::Vector3d c_nister = -R_nister.transpose() * t_nister;
 
-        double err_fivept = compute_error(t,t_fivept);
-        // std::cout << "E:\n" << E/E.norm() << "\n";
-        // std::cout << "E_fivept:\n" << E_fivept/E_fivept.norm() << "\n";
-        // std::cout << "t: " << t.transpose()/t.norm() << "\n";
-        // std::cout << "t_fivept: " << t_fivept.transpose()/t_fivept.norm() << "\n";
-        // std::cout << (c - c_fivept).norm() << "\n";
-        std::cout << "fivepoint error: " << err_fivept << "\n";
-        // std::cout << "fivepoint acos error: " << acos(err_fivept) << "\n";
+            double E_err_nister = compute_essential_error(E,E_nister);
+            double R_err_nister = compute_rot_error(R,R_nister);
+            double t_err_nister = compute_trans_error(t,t_nister);
+            // std::cout << "E:\n" << normalize_E(E) << "\n";
+            // for ( int i = 0; i < Es_nister.size(); i++ )
+            // {
+            //     std::cout << "E_nister " << i << ":\n" << normalize_E(Es_nister[i]) << "\n";
+            // }
+            // std::cout << "t: " << t.transpose()/t.norm() << "\n";
+            // std::cout << "t_nister: " << t_nister.transpose()/t_nister.norm() << "\n";
+            // std::cout << (c - c_nister).norm() << "\n";
+            // std::cout << "fivepoint E error: " << E_err_nister << "\n";
+            // std::cout << "fivepoint t error: " << t_err_nister << "\n";
+            // std::cout << "fivepoint acos error: " << acos(err_nister) << "\n";
 
-        // compute spherical three-point relative pose
-        // spherical_solver_action_matrix(const RayPairList &correspondences, const std::vector<int>& sample, std::vector<Eigen::Matrix3d>* Es);
+            // compute stewenius five-point relative pose
+            Eigen::Matrix3d R_stewenius;
+            Eigen::Vector3d t_stewenius;
+            std::vector<Eigen::Matrix3d> Es_stewenius;
+            if ( !compute_stewenius(x1, x2, Es_stewenius, R_stewenius, t_stewenius ) ) continue;
+            Eigen::Matrix3d E_stewenius = sphericalsfm::skew3(t_stewenius)*R_stewenius;
+            // Eigen::Vector3d c_stewenius = -R_stewenius.transpose() * t_stewenius;
+
+            double E_err_stewenius = compute_essential_error(E,E_stewenius);
+            double R_err_stewenius = compute_rot_error(R,R_stewenius);
+            double t_err_stewenius = compute_trans_error(t,t_stewenius);
+
+            // compute spherical three-point relative pose
+            Eigen::Matrix3d R_threept;
+            Eigen::Vector3d t_threept;
+            std::vector<Eigen::Matrix3d> Es_threept;
+            if ( !compute_threept(x1, x2, Es_threept, R_threept, t_threept ) ) continue;
+            Eigen::Matrix3d E_threept = sphericalsfm::skew3(t_threept)*R_threept;
+            double E_err_threept = compute_essential_error(E,E_threept);
+            double R_err_threept = compute_rot_error(R,R_threept);
+            double t_err_threept = compute_trans_error(t,t_threept);
+            // std::cout << "threepoint E error: " << E_err_threept << "\n";
+            // std::cout << "threepoint t error: " << t_err_threept << "\n";
+
+            fprintf(f,"%d,%d,%f,%f,%f,nister\n",iangle,inoise,E_err_nister,R_err_nister,t_err_nister);
+            fprintf(f,"%d,%d,%f,%f,%f,stewenius\n",iangle,inoise,E_err_stewenius,R_err_stewenius,t_err_stewenius);
+            fprintf(f,"%d,%d,%f,%f,%f,threept\n",iangle,inoise,E_err_threept,R_err_threept,t_err_threept);
+        }
     }
+    fclose(f);
 }

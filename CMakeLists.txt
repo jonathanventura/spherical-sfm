@@ -11,6 +11,7 @@ endif()
 project( spherical-sfm )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall")
+add_definitions (-march=native)
 
 find_package( Ceres REQUIRED )
 include_directories( ${CERES_INCLUDE_DIRS} )

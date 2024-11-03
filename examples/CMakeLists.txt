@@ -54,3 +54,7 @@ if ( BUILD_STITCHER )
     target_link_libraries( make_circle_views sphericalsfmtools gflags )
 endif ()
 
+find_package( PoseLib REQUIRED ) 
+find_package( opengv REQUIRED ) 
+add_executable( test_spherical_relpose test_spherical_relpose.cpp )
+target_link_libraries( test_spherical_relpose sphericalsfm PoseLib opengv )
