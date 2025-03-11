@@ -312,7 +312,8 @@ def read_cameras_from_sparse(sparse_path):
     cameras_info = []
     for image in images.values():
         cam_info = {}
-        camera = cameras[1]
+        # camera = cameras[1]
+        camera = cameras[image.camera_id]
         cam_info['img_name'] = image.name
 
         cam_info['intrinsics'] = camera.params
@@ -328,6 +329,7 @@ def read_cameras_from_sparse(sparse_path):
 
 def read_cameras_from_sparse_np(sparse_path):
     cameras, images, points3D = read_model(sparse_path)
+    # print(cameras)
     cameras_info = []
     for image in images.values():
         cam_info = {}

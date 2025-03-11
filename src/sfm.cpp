@@ -570,9 +570,9 @@ namespace sphericalsfm {
         }
     }
     
-    void SfM::WriteCOLMAP( const std::string &path, int width, int height )
+    void SfM::WriteCOLMAP( const std::string &sparse_dir, int width, int height )
     {
-        std::string sparse_dir = path + "/sparse";
+        // std::string sparse_dir = path + "/sparse";
         mkdir(sparse_dir.c_str(),0777);
 
         // write cameras.txt

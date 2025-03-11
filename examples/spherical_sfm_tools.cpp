@@ -805,8 +805,10 @@ namespace sphericalsfmtools {
         for ( int i = 0 ; i < num_cameras; i++ ) {
             view_graph.AddNode(gopt::graph::ViewNode(i));
         }
+        std::cout << "num cameras is " << num_cameras << "\n";
         for ( auto im : image_matches ) {
             gopt::graph::ViewEdge edge(im.index0,im.index1);
+            std::cout << "adding edge from " << im.index0 << " to " << im.index1 << "\n";
             edge.rel_rotation = so3ln(im.R);
             view_graph.AddEdge(edge);
         }
@@ -1097,7 +1099,7 @@ namespace sphericalsfmtools {
         return cost;
     }
 
-    static void transform_image_matches( double focal, const FocalLengthSearchParams *search_params, std::vector<ImageMatch> &image_matches_new )
+static void transform_image_matches( double focal, const FocalLengthSearchParams *search_params, std::vector<ImageMatch> &image_matches_new )
     {
         image_matches_new.clear();
 
@@ -1170,7 +1172,7 @@ namespace sphericalsfmtools {
         return cost;
     }
 
-    double optimize_focal_length( double (* function) (double x, void * params), double initial_focal, double min_focal, double max_focal, FocalLengthSearchParams *params )
+double optimize_focal_length( double (* function) (double x, void * params), double initial_focal, double min_focal, double max_focal, FocalLengthSearchParams *params )
     {
         int status;
         int iter = 0, max_iter = 100;
@@ -1286,6 +1288,13 @@ namespace sphericalsfmtools {
         best_focal = optimize_focal_length( &loop_constraint_cost_fn, focal_init, min_focal, max_focal, &params );
         std::cout << "best focal: " << best_focal << "\n";
 
+        std::vector<ImageMatch> image_matches_new;
+
+        transform_image_matches( best_focal, &params, image_matches_new );
+        initialize_rotations( num_cameras, image_matches_new, sequential, rotations );
+         
+        std::cout << "focal before optimization: " << best_focal << "\n";
+        params.rotations = rotations;
         run_optimization( best_focal, &params, min_focal, max_focal );
         rotations = params.rotations;
         std::cout << "focal after optimization: " << best_focal << "\n";
@@ -1432,6 +1441,7 @@ namespace sphericalsfmtools {
 
         std::vector<double> focals(num_trials);
         std::vector<double> costs(num_trials);
+
 #pragma omp parallel for
         for ( int trial = 0; trial < num_trials; trial++ )
         {
@@ -1440,6 +1450,12 @@ namespace sphericalsfmtools {
             focals[trial] = focal;
             costs[trial] = cost;
         }
+        FILE *f = fopen("costs.txt","w");
+        for ( int trial = 0; trial < num_trials; trial++ )
+        {
+            fprintf(f,"%d %lf %lf\n",trial,focals[trial],costs[trial]);
+        }
+        fclose(f);
         for ( int trial = 0; trial < num_trials; trial++ )
         {
             if ( costs[trial] < best_cost ) 
@@ -1453,7 +1469,7 @@ namespace sphericalsfmtools {
 
         transform_image_matches( best_focal, &params, image_matches_new );
         initialize_rotations( num_cameras, image_matches_new, sequential, rotations );
-         
+        
         std::cout << "before optimization: " << best_focal << "\n";
         params.rotations = rotations;
         run_optimization( best_focal, &params, min_focal, max_focal );

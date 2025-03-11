@@ -89,3 +89,14 @@ RUN wget https://github.com/colmap/colmap/archive/refs/tags/3.9.1.zip && \
     make install
 
 RUN apt-get install python3-pip -y
+
+RUN git clone https://github.com/laurentkneip/opengv.git && \
+    cd opengv && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make -j8 && \
+    make install
+
+RUN pip install numpy torch
+RUN pip install pandas

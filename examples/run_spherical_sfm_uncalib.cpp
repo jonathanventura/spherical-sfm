@@ -45,9 +45,10 @@ int main( int argc, char **argv )
         COLMAP::Database db( FLAGS_output + "/database.db" );
         db.read();
         int index = 0;
+        std::cout << "loading images and COLMAP features and matches...\n";
         for ( auto it : db.images )
         {
-            std::cout << it.second.name << "\n";
+            // std::cout << it.second.name << "\n";
             cv::Mat image = cv::imread(FLAGS_images + "/" + it.second.name);
             if ( index == 0 )
             {
@@ -126,21 +127,23 @@ int main( int argc, char **argv )
     const double max_total_rot = 450*M_PI/180.;
     std::vector<Eigen::Matrix3d> rotations;
     double focal_new;
-    //bool success = find_best_focal_length_opt( keyframes.size(), 
-            //image_matches, FLAGS_inward, FLAGS_sequential, focal_guess,
-            //min_focal, max_focal,
-            //rotations,
-            //focal_new );
-    //bool success = find_best_focal_length_grid( keyframes.size(), 
-            //image_matches, FLAGS_inward, FLAGS_sequential, focal_guess,
-            //min_focal, max_focal, num_steps,
-            //rotations,
-            //focal_new );
+    // bool success = find_best_focal_length_opt( keyframes.size(), 
+    //         image_matches, FLAGS_inward, FLAGS_sequential, focal_guess,
+    //         min_focal, max_focal,
+    //         rotations,
+    //         focal_new );
+    // bool success = find_best_focal_length_grid( keyframes.size(), 
+    //         image_matches, FLAGS_inward, FLAGS_sequential, focal_guess,
+    //         min_focal, max_focal, num_steps,
+    //         rotations,
+    //         focal_new );
+
     bool success = find_best_focal_length_random( keyframes.size(), 
             image_matches, FLAGS_inward, FLAGS_sequential, focal_guess,
             min_focal, max_focal, num_trials,
             rotations,
             focal_new );
+    exit(0);
     if ( !success )
     {
         std::cout << "ERROR: could not find any acceptable focal length\n";
@@ -154,7 +157,9 @@ int main( int argc, char **argv )
     SfM sfm( intrinsics );
     build_sfm( keyframes, image_matches, rotations, sfm, true, true, FLAGS_inward );
     sfm.SetFocalFixed(false);
-    
+
+    sfm.WriteCOLMAP( FLAGS_output + "/sparse-pre-spherical-ba", width, height );
+
     sfm.WritePointsOBJ( FLAGS_output + "/points-pre-spherical-ba.obj" );
     sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras-pre-spherical-ba.obj" );
     
@@ -162,8 +167,10 @@ int main( int argc, char **argv )
     sfm.Retriangulate();
     sfm.Optimize();
 
-    sfm.WritePointsOBJ( FLAGS_output + "/points-pre-ba.obj" );
-    sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras-pre-ba.obj" );
+    sfm.WriteCOLMAP( FLAGS_output + "/sparse-pre-general-ba", width, height );
+
+    sfm.WritePointsOBJ( FLAGS_output + "/points-pre-general-ba.obj" );
+    sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras-pre-general-ba.obj" );
     
     std::cout << "focal after spherical BA: " << sfm.GetFocal() << "\n";
     
@@ -193,7 +200,7 @@ int main( int argc, char **argv )
     sfm.WritePointsOBJ( FLAGS_output + "/points.obj" );
     sfm.WriteCameraCentersOBJ( FLAGS_output + "/cameras.obj" );
 
-    sfm.WriteCOLMAP( FLAGS_output, width, height );
+    sfm.WriteCOLMAP( FLAGS_output + "/sparse", width, height );
         
 
     std::string calib_path = FLAGS_output + "/calib.txt";
