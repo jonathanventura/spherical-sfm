@@ -46,8 +46,8 @@ namespace sphericalsfm {
             Eigen::Matrix<T,3,3> s;
             s <<
             T(0), -t[2], t[1],
-            t[2], t(0), -t[0],
-            -t[1], t[0], t(0);
+            t[2], T(0), -t[0],
+            -t[1], t[0], T(0);
             Eigen::Matrix<T,3,3> E = s * R;
 
             Eigen::Map< const Eigen::Matrix<T,3,1> > u(u_data);
