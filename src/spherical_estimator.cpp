@@ -54,10 +54,11 @@ namespace sphericalsfm {
             Eigen::Map< const Eigen::Matrix<T,3,1> > u(u_data);
             Eigen::Map< const Eigen::Matrix<T,3,1> > v(v_data);
 
-            Eigen::Matrix<T,3,1> line = E * (u/u(2));
-            T d = v.dot( line );
-        
-            residuals[0] = d / sqrt(line[0]*line[0] + line[1]*line[1]);
+            Eigen::Matrix<T,3,1> Eu = E * u;
+            Eigen::Matrix<T,3,1> Etv = E.transpose() * v;
+
+            T d = v.dot( Eu );
+            residuals[0] = (d*d) / ( Eu.head(2).squaredNorm() + Etv.head(2).squaredNorm() );
             
             return true;
         }
@@ -69,10 +70,11 @@ namespace sphericalsfm {
         const RayPair &ray_pair(correspondences[i]);
         const Eigen::Vector3d &u = ray_pair.first;
         const Eigen::Vector3d &v = ray_pair.second;
-        const Eigen::Vector3d line = E * (u/u(2));
-        const double d = v.dot( line );
+        const Eigen::Vector3d Eu = E * u;
+        const Eigen::Vector3d Etv = E.transpose() * v;
         
-        return (d*d) / (line[0]*line[0] + line[1]*line[1]);
+        const double d = v.dot( Eu );
+        return (d*d) / ( Eu.head(2).squaredNorm() + Etv.head(2).squaredNorm() );
     }
 
     int SphericalEstimator::MinimalSolver(const std::vector<int>& sample, std::vector<Eigen::Matrix3d>* Es) const

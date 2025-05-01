@@ -8,7 +8,6 @@
 #include <gflags/gflags.h>
 
 #include <opencv2/highgui.hpp>
-#include <opencv2/video.hpp>
 
 #include "spherical_sfm_tools.h"
 #include "spherical_sfm_io.h"
@@ -143,7 +142,7 @@ int main( int argc, char **argv )
             min_focal, max_focal, num_trials,
             rotations,
             focal_new );
-    exit(0);
+    //exit(0);
     if ( !success )
     {
         std::cout << "ERROR: could not find any acceptable focal length\n";

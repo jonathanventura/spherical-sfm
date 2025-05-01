@@ -174,7 +174,7 @@ namespace sphericalsfm {
             if ( tri_observations.size() < 3 ) continue;
             
             ransac_lib::LORansacOptions options;
-            options.squared_inlier_threshold_ = 4.*(intrinsics.focal*intrinsics.focal);
+            options.squared_inlier_threshold_ = 4.;
             options.final_least_squares_ = true;
             ransac_lib::RansacStatistics stats;
 

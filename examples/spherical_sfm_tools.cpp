@@ -6,7 +6,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
 #include <opencv2/flann.hpp>
-#include <opencv2/video.hpp>
+// #include <opencv2/video.hpp>
 
 #include <cstdio>
 #include <iostream>
@@ -204,6 +204,7 @@ namespace sphericalsfmtools {
         }
     }
 
+/*
     void DetectorTracker::track( cv::Mat &image0, cv::Mat &image1,
                 const Features &features0, Features &features1,
                 Matches &m01 )
@@ -226,6 +227,7 @@ namespace sphericalsfmtools {
             m01[i] = features1.size()-1;
         }
     }
+*/
 
     void match( const Features &features0, const Features &features1, Matches &m01, double ratio )
     {
@@ -262,143 +264,6 @@ namespace sphericalsfmtools {
             }
         }
     }
-
-    /*
-    void build_feature_tracks( const Intrinsics &intrinsics, const std::string &videopath,
-                              std::vector<Keyframe> &keyframes, std::vector<ImageMatch> &image_matches,
-                              const double inlier_threshold, const double min_rot,
-                              const bool inward )
-    {
-        Eigen::Matrix3d Kinv = intrinsics.getKinv();
-        
-        cv::VideoCapture cap(videopath);
-        
-        cv::Mat image0_in, image0;
-        if ( !cap.read(image0_in) )
-        {
-            std::cout << "error: could not read single frame from " << videopath << "\n";
-            exit(1);
-        }
-        if ( image0_in.channels() == 3 ) cv::cvtColor( image0_in, image0, cv::COLOR_BGR2GRAY );
-        else image0 = image0_in;
-        
-        int xradius = image0.cols/48;
-        int yradius = image0.rows/48;
-        
-        std::cout << "image0 has size " << image0.cols << " " << image0.rows << "\n";
-        std::cout << "radii: " << xradius << " " << yradius << "\n";
-        double min_dist = 20;
-        DetectorTracker detectortracker( min_dist, xradius, yradius );
-
-        Features features0;
-        detectortracker.detect( image0, features0 );
-        
-        keyframes.push_back(Keyframe(0,features0));
-        image0.copyTo(keyframes[keyframes.size()-1].image);
-
-        std::cout << "detected " << features0.size() << " features in image 0\n";
-        
-        ransac_lib::LORansacOptions options;
-        options.squared_inlier_threshold_ = inlier_threshold*inlier_threshold*Kinv(0)*Kinv(0);
-        //options.final_least_squares_ = true;
-        options.num_lo_steps_ = 0;
-        options.num_lsq_iterations_ = 0;
-        options.final_least_squares_ = false;
-        ransac_lib::RansacStatistics stats;
-
-        int kf_index = 1;
-        int video_index = 1;
-        cv::Mat image1_in, image1;
-        while ( cap.read( image1_in ) )
-        {
-            if ( image1_in.channels() == 3 ) cv::cvtColor( image1_in, image1, cv::COLOR_BGR2GRAY );
-            else image1 = image1_in;
-
-            Features features1;
-            
-            Matches m01;
-            
-            detectortracker.detect( image1, features1 );
-            match( features0, features1, m01 );
-            std::cout << "tracked " << features1.size() << " features in image " << video_index << "\n";
-                
-            //cv::Mat matchesim;
-            //drawmatches( image0, image1, features0, features1, m01, matchesim );
-            //cv::imwrite( "matches" + std::to_string(video_index) + ".png", matchesim );
-
-            std::vector<bool> inliers;
-            int ninliers;
-
-            // find inlier matches using relative pose
-            RayPairList ray_pair_list;
-            ray_pair_list.reserve( m01.size() );
-            for ( Matches::const_iterator it = m01.begin(); it != m01.end(); it++ )
-            {
-                size_t index0 = it->first;
-                size_t index1 = it->second;
-
-                Eigen::Vector3d loc0 = Eigen::Vector3d( features0.points[index0].x, features0.points[index0].y, 1 );
-                Eigen::Vector3d loc1 = Eigen::Vector3d( features1.points[index1].x, features1.points[index1].y, 1 );
-                loc0 = Kinv * loc0;
-                loc1 = Kinv * loc1;
-                
-                Ray u;
-                u.head(3) = loc0;
-                Ray v;
-                v.head(3) = loc1;
-
-                ray_pair_list.push_back( std::make_pair( u, v ) );
-            }
-            SphericalEstimator estimator( ray_pair_list, false, inward );
-            
-            std::cout << "running ransac on " << ray_pair_list.size() << " matches\n";
-            ransac_lib::LocallyOptimizedMSAC<Eigen::Matrix3d,std::vector<Eigen::Matrix3d>,SphericalEstimator> ransac;
-            
-            Eigen::Matrix3d E;
-            ninliers = ransac.EstimateModel( options, estimator, &E, &stats );
-            inliers.resize(ray_pair_list.size());
-            for ( int i = 0; i < ray_pair_list.size(); i++ )
-            {
-                inliers[i] = ( estimator.EvaluateModelOnPoint(E,i) < options.squared_inlier_threshold_ );
-            }
-            fprintf( stdout, "%d: %lu matches and %d inliers (%0.2f%%)\n", video_index, m01.size(), ninliers, (double)ninliers/(double)m01.size()*100 );
-
-            Eigen::Vector3d best_estimator_t;
-            Eigen::Vector3d best_estimator_r;
-            decompose_spherical_essential_matrix( E, inward, best_estimator_r, best_estimator_t );
-            std::cout << best_estimator_r.transpose() << "\n";
-
-            // check for minimum rotation
-            if ( best_estimator_r.norm() < min_rot * M_PI / 180. ) {
-                std::cout << "skipping frame\n";
-                video_index++;
-                continue;
-            }
-
-            Matches m01inliers;
-            size_t i = 0;
-            for ( Matches::const_iterator it = m01.begin(); it != m01.end(); it++ )
-            {
-                if ( inliers[i++] ) m01inliers[it->first] = it->second;
-            }
-            //cv::Mat inliersim;
-            //drawmatches( image0, image1, features0, features1, m01inliers, inliersim );
-            //cv::imwrite( "inliers" + std::to_string(video_index) + ".png", inliersim );
-            
-            image1.copyTo(image0);
-            features0 = features1;
-            
-            std::cout << "features0 now has " << features0.size() << " features\n";
-            // also detect new points that are some distance away from matched points
-
-            keyframes.push_back(Keyframe(video_index,features0));
-            image0.copyTo(keyframes[keyframes.size()-1].image);
-            image_matches.push_back( ImageMatch( kf_index-1, kf_index, m01, so3exp(best_estimator_r) ) );
-            video_index++;
-            kf_index++;
-        }
-    }
-    */
 
     void detect_features( const std::string &videopath, std::vector<Keyframe> &keyframes )
     {
@@ -517,8 +382,8 @@ namespace sphericalsfmtools {
                     inliers[i] = ( estimator.EvaluateModelOnPoint(E,i) < options.squared_inlier_threshold_ );
                 }
             }
-            //fprintf( stdout, "%d %d: %lu matches and %d inliers (%0.2f%%)\n",
-                     //keyframes[index0].index, keyframes[index1].index, m01.size(), ninliers, (double)ninliers/(double)m01.size()*100 );
+            // fprintf( stdout, "%d %d: %lu matches and %d inliers (%0.2f%%)\n",
+                    //  keyframes[index0].index, keyframes[index1].index, m01.size(), ninliers, (double)ninliers/(double)m01.size()*100 );
 
             Matches m01inliers;
             size_t j = 0;
