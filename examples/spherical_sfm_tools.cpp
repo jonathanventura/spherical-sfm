@@ -4,9 +4,9 @@
 
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/xfeatures2d.hpp>
+#include <opencv2/features2d.hpp>
 #include <opencv2/flann.hpp>
-#include <opencv2/video.hpp>
+// #include <opencv2/video.hpp>
 
 #include <cstdio>
 #include <iostream>
@@ -160,10 +160,10 @@ namespace sphericalsfmtools {
         double min_dist; // minimum distance between existing points and detecting points
         const int xradius; // horizontal tracking radius
         const int yradius; // vertical tracking radius
-        cv::Ptr<cv::xfeatures2d::SIFT> sift;
+        cv::Ptr<cv::SIFT> sift;
     public:
         DetectorTracker( double _min_dist=0, double _xradius=0, double _yradius=0 ) :
-        min_dist(_min_dist), xradius(_xradius), yradius(_yradius), sift(cv::xfeatures2d::SIFT::create(20000)) { }
+        min_dist(_min_dist), xradius(_xradius), yradius(_yradius), sift(cv::SIFT::create(20000)) { }
         
         void detect( const cv::Mat &image, Features &features )
         {
@@ -195,6 +195,7 @@ namespace sphericalsfmtools {
             }
         }
 
+        /*
         void track( cv::Mat &image0, cv::Mat &image1,
                     const Features &features0, Features &features1,
                     Matches &m01 )
@@ -217,7 +218,7 @@ namespace sphericalsfmtools {
                 m01[i] = features1.size()-1;
             }
         }
-
+        */
     };
 
     void match( const Features &features0, const Features &features1, Matches &m01, double ratio = 0.75 )
