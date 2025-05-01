@@ -24,10 +24,11 @@ namespace sphericalsfm {
     {
         const Eigen::Vector3d &u = it->first.head(3);
         const Eigen::Vector3d &v = it->second.head(3);
-        const Eigen::Vector3d line = E * (u/u(2));
-        const double d = v.dot( line );
+        const Eigen::Vector3d Eu = E * u;
+        const Eigen::Vector3d Etv = E.transpose() * v;
         
-        return (d*d) / (line[0]*line[0] + line[1]*line[1]);
+        const double d = v.dot( Eu );
+        return (d*d) / (Eu.head(2).squaredNorm() + Etv.head(2).squaredNorm());
     }
 
     void SphericalFastEstimator::chooseSolution( int soln )
