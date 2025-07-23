@@ -27,7 +27,8 @@ RUN apt-get -y update && apt-get -y install \
     libgtest-dev \
     libsqlite3-dev \
     libglew-dev \
-    libcgal-dev -y
+    libcgal-dev \
+    python3-pandas
 
 WORKDIR /opencv
 
@@ -97,4 +98,4 @@ RUN git clone https://github.com/jonathanventura/GraphOptim.git && \
     mkdir build && cd build && \
     cmake .. && \
     make -j8 && \
-    make install && echo 'a'
+    make install

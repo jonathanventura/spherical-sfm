@@ -27,6 +27,7 @@ DEFINE_bool(inward, false, "Cameras are inward facing");
 DEFINE_bool(sequential, false, "Images are sequential");
 DEFINE_bool(generalba, false, "Run general bundle adjustment step");
 DEFINE_bool(colmap, false, "Load feature matches from COLMAP");
+DEFINE_bool(fivepoint, false, "Use five point instead of three point estimator");
 
 int main( int argc, char **argv )
 {
@@ -102,8 +103,15 @@ int main( int argc, char **argv )
     centery = height/2;
     std::cout << "initial focal: " << focal_guess << "\n";
     Intrinsics intrinsics_guess(focal_guess,centerx,centery);
-    int loop_closure_count = estimate_pairwise( intrinsics_guess, keyframes, all_image_matches,
-                        FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_inward, image_matches );
+    int loop_closure_count = 0;
+    if ( FLAGS_fivepoint )
+    {
+        loop_closure_count = estimate_pairwise_five_point( intrinsics_guess, keyframes, all_image_matches,
+                            FLAGS_inlierthresh, FLAGS_mininliers, image_matches );
+    } else {
+        loop_closure_count = estimate_pairwise( intrinsics_guess, keyframes, all_image_matches,
+                            FLAGS_inlierthresh, FLAGS_mininliers, FLAGS_inward, image_matches );
+    }
     if ( loop_closure_count == 0 ) 
     {
         std::cout << "error: no matches found\n";
@@ -118,6 +126,18 @@ int main( int argc, char **argv )
     {
         std::cout << im.index0 << " " << im.index1 << " " << so3ln(im.R).transpose() << "\n";
     }
+
+    // std::vector<Eigen::Matrix3d> rotations_guess;
+    // initialize_rotations( keyframes.size(), image_matches, FLAGS_sequential, rotations_guess );
+    // SfM sfm_guess( intrinsics_guess );
+    // build_sfm( keyframes, image_matches, rotations_guess, sfm_guess, true, true, FLAGS_inward );
+    // sfm_guess.SetFocalFixed(false);
+    // sfm_guess.Optimize();
+    // sfm_guess.Retriangulate();
+    // sfm_guess.Optimize();
+    // sfm_guess.WriteCOLMAP( FLAGS_output + "/sparse-focal-guess", width, height );
+    // exit(0);
+
     const double min_focal = focal_guess/4;
     const double max_focal = focal_guess*2;
     const int num_steps = 64;

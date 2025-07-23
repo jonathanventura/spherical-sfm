@@ -15,6 +15,8 @@
 #include <cassert>
 
 #include <sphericalsfm/spherical_estimator.h>
+#include "../evaluation/five_point/five_point_estimator.h"
+#include "../evaluation/five_point/stewenius_estimator.h"
 #include <sphericalsfm/so3.h>
 #include <sphericalsfm/rotation_averaging.h>
 #include <sphericalsfm/uncalibrated_pose_graph.h>
@@ -407,6 +409,148 @@ namespace sphericalsfmtools {
 
                 image_match.matches = m01inliers;
                 image_match.R = so3exp(best_estimator_r);
+            }
+        }
+        
+        int loop_closure_count = 0;
+        for ( int i = 0; i < my_image_matches.size(); i++ )
+        {
+            if ( my_image_matches[i].matches.empty() ) continue;
+            if ( my_image_matches[i].index0 + 1 != my_image_matches[i].index1 ) loop_closure_count++;
+            image_matches_out.push_back( my_image_matches[i] );
+        }
+        
+        return loop_closure_count;
+    }
+
+    int estimate_pairwise_five_point( const Intrinsics &intrinsics, const std::vector<Keyframe> &keyframes, const std::vector<ImageMatch> &image_matches,
+                        const double inlier_threshold, const int min_num_inliers, std::vector<ImageMatch> &image_matches_out )
+    {
+        Eigen::Matrix3d Kinv = intrinsics.getKinv();
+        
+        ransac_lib::LORansacOptions options;
+        options.squared_inlier_threshold_ = inlier_threshold*inlier_threshold*Kinv(0)*Kinv(0);
+        options.num_lo_steps_ = 0;
+        options.num_lsq_iterations_ = 0;
+        options.final_least_squares_ = true;
+
+        std::vector<ImageMatch> my_image_matches; 
+        for ( int index0 = 0; index0 < keyframes.size(); index0++ )
+        {
+            for ( int index1 = index0+1; index1 < keyframes.size(); index1++ )
+            {
+                Matches m;
+                Eigen::Matrix3d R;
+                ImageMatch image_match(index0, index1, m, R);
+                my_image_matches.push_back(image_match);
+            }
+        }
+
+    #pragma omp parallel for
+        for ( int i = 0; i < my_image_matches.size(); i++ ) 
+        {
+            ImageMatch &image_match = my_image_matches[i];
+            int index0 = image_match.index0;
+            int index1 = image_match.index1;
+            const Features &features0 = keyframes[index0].features;
+            const Features &features1 = keyframes[index1].features;
+
+            Matches m01;
+                
+            for ( auto m : image_matches )
+            { 
+                if ( m.index0 == index0 && m.index1 == index1 )
+                {
+                    m01 = m.matches;
+                    break;
+                }
+            }
+            if ( m01.size() < min_num_inliers ) continue;
+
+            std::vector<bool> inliers;
+            int ninliers;
+
+            // find inlier matches using relative pose
+            RayPairList ray_pair_list;
+            ray_pair_list.reserve( m01.size() );
+            for ( Matches::const_iterator it = m01.begin(); it != m01.end(); it++ )
+            {
+                cv::Point2f pt0 = features0.points[it->first];
+                cv::Point2f pt1 = features1.points[it->second];
+
+                Eigen::Vector3d loc0 = Eigen::Vector3d( pt0.x, pt0.y, 1 );
+                Eigen::Vector3d loc1 = Eigen::Vector3d( pt1.x, pt1.y, 1 );
+                
+                loc0 = Kinv * loc0;
+                loc1 = Kinv * loc1;
+                
+                Ray u;
+                u.head(3) = loc0;
+                Ray v;
+                v.head(3) = loc1;
+
+                ray_pair_list.push_back( std::make_pair( u, v ) );
+            }
+                
+            SteweniusEstimator estimator(ray_pair_list);
+
+            ransac_lib::LocallyOptimizedMSAC<Eigen::Matrix3d,std::vector<Eigen::Matrix3d>,SteweniusEstimator> ransac;
+            ransac_lib::RansacStatistics stats;
+            Eigen::Matrix3d E;
+            if ( m01.empty() )
+            {
+                ninliers = 0;
+            } else {
+                ninliers = ransac.EstimateModel( options, estimator, &E, &stats );
+                inliers.resize(ray_pair_list.size());
+                for ( int i = 0; i < ray_pair_list.size(); i++ )
+                {
+                    inliers[i] = ( estimator.EvaluateModelOnPoint(E,i) < options.squared_inlier_threshold_ );
+                }
+            }
+            // fprintf( stdout, "%d %d: %lu matches and %d inliers (%0.2f%%)\n",
+                    //  keyframes[index0].index, keyframes[index1].index, m01.size(), ninliers, (double)ninliers/(double)m01.size()*100 );
+
+            Matches m01inliers;
+            size_t j = 0;
+            for ( Matches::const_iterator it = m01.begin(); it != m01.end(); it++ )
+            {
+                if ( inliers[j++] ) m01inliers[it->first] = it->second;
+            }
+                
+            /*
+            cv::Mat matchesim;
+            drawmatches( keyframes[index0].image, keyframes[index1].image, features0, features1, m01inliers, matchesim );
+            cv::imwrite( "inliers" + std::to_string(keyframes[index0].index) + "-" + std::to_string(keyframes[index1].index) + ".png", matchesim );
+            */
+
+            if ( ninliers > min_num_inliers )
+            {
+                // Eigen::Vector3d best_estimator_t;
+                // Eigen::Vector3d best_estimator_r;
+                // decompose_spherical_essential_matrix( E, inward, best_estimator_r, best_estimator_t );
+                //std::cout << best_estimator_r.transpose() << "\n";
+
+                std::vector<Eigen::Vector2d> points1;
+                std::vector<Eigen::Vector2d> points2;
+
+                for ( int j = 0; j < ray_pair_list.size(); j++ )
+                {
+                    if ( inliers[j] )
+                    {
+                        points1.push_back(ray_pair_list[j].first.head(2)/ray_pair_list[j].first(2));
+                        points2.push_back(ray_pair_list[j].second.head(2)/ray_pair_list[j].second(2));
+                    }
+                }
+
+                Eigen::Matrix3d R;
+                Eigen::Vector3d t;
+                std::vector<Eigen::Vector3d> points3D;
+
+                PoseFromEssentialMatrix(E, points1, points2, &R, &t, &points3D);
+
+                image_match.matches = m01inliers;
+                image_match.R = R;
             }
         }
         
@@ -979,7 +1123,7 @@ static void transform_image_matches( double focal, const FocalLengthSearchParams
         }
     }
     
-    static void initialize_rotations( int num_cameras, const std::vector<ImageMatch> &image_matches, bool sequential, std::vector<Eigen::Matrix3d> &rotations )
+    void initialize_rotations( int num_cameras, const std::vector<ImageMatch> &image_matches, bool sequential, std::vector<Eigen::Matrix3d> &rotations )
     {
         if ( sequential ) {
             initialize_rotations_sequential( num_cameras, image_matches, rotations );

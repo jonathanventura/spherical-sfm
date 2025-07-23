@@ -2,6 +2,8 @@ find_package(OpenMP)
 find_package(gflags REQUIRED)
 find_package(Boost REQUIRED)
 find_package(GSL REQUIRED)
+find_package( PoseLib REQUIRED ) 
+find_package( opengv REQUIRED ) 
 
 find_package( SQLite3 REQUIRED )
 include_directories( ${SQLite3_INCLUDE_DIRS} )
@@ -20,6 +22,7 @@ link_directories(${GOPT_LINK_DIRS})
 
 add_library( sphericalsfmtools
     colmap.h colmap.cpp
+    six_point_estimator.h six_point_estimator.cpp
     spherical_sfm_tools.h spherical_sfm_tools.cpp
     spherical_sfm_io.h spherical_sfm_io.cpp
 )
@@ -31,6 +34,8 @@ target_link_libraries( sphericalsfmtools ${SQLite3_LIBRARIES} )
 if ( OpenMP_FOUND )
     target_link_libraries( sphericalsfmtools OpenMP::OpenMP_CXX )
 endif()
+target_link_libraries( sphericalsfmtools PoseLib )
+target_link_libraries( sphericalsfmtools five_point )
 
 
 add_executable( undistort_images undistort_images.cpp )
@@ -54,7 +59,5 @@ if ( BUILD_STITCHER )
     target_link_libraries( make_circle_views sphericalsfmtools gflags )
 endif ()
 
-find_package( PoseLib REQUIRED ) 
-find_package( opengv REQUIRED ) 
 add_executable( test_spherical_relpose test_spherical_relpose.cpp )
 target_link_libraries( test_spherical_relpose sphericalsfm PoseLib opengv )
