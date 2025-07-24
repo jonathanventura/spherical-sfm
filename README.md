@@ -4,6 +4,8 @@
 
 Code for our papers:
 
+Ventura, J., V. Larsson, F. Kahl.  "Uncalibrated Structure from Motion on a Sphere", International Conference on Computer Vision (ICCV), 2025.
+
 Baker, L., S. Mills, S. Zollmann, and J. Ventura, "CasualStereo: Casual Capture of Stereo Panoramas with Spherical Structure-from-Motion", IEEE Conference on Virtual Reality and 3D User Interfaces (VR), 2020.
 
 Ventura, J., "Structure from Motion on a Sphere", European Conference on Computer Vision (ECCV), 2016.
@@ -32,6 +34,8 @@ The panorama stitcher app is disabled by default, since it requires CUDA which m
     
 ### Usage
 
+#### Calibrated Pipeline
+
 If your images have radial distortion, first undistort them using:
 
     undistort_images -intrinsics <path to intrinsics with distortion> -intrinsicsout <path for output intrinsics file> -video <path to video> -output <path ot folder for undistorted images> -rotate <rotation>
@@ -42,11 +46,39 @@ To run the spherical structure-from-motion pipeline:
 
     run_spherical_sfm -intrinsics <path to intrinsics> -video <path to video> -output <path to output>
 
-The video path can be an image filename specifier such as %06d.png.  The intrinsics file should contain the focal length, center x, and center y separated by spaces.
+The video path can be an image filename specifier such as `%06d.png`.  The intrinsics file should contain the focal length, center x, and center y separated by spaces.
 
 To make the stereo panoramas:
 
     make_stereo_panorama -intrinsics <path to intrinsics> -video <path to video> -output <path to output>
+
+#### Uncalibrated Pipeline
+
+The uncalibrated pipeline supports estimating a single shared focal length.  
+
+    run_spherical_sfm_uncalib \
+        -images <path to video> \
+        -output <path to output>
+
+Alternately, you can use COLMAP to extract and match features, and then use our pipeline to perform the reconstruction.
+
+    PREFIX=<path to your dataset>
+
+    colmap feature_extractor \
+        --database_path $PREFIX/database.db \
+        --image_path $PREFIX/images \
+        --ImageReader.camera_model=SIMPLE_PINHOLE \
+        --ImageReader.single_camera=1
+
+    colmap exhaustive_matcher \
+        --database_path $PREFIX/database.db
+
+    run_spherical_sfm_uncalib \
+        -output $PREFIX \
+        -images $PREFIX/images \
+        -colmap \
+        -sequential \
+        -generalba
 
 ### Capture tips
 
