@@ -44,9 +44,6 @@ target_link_libraries( undistort_images ${OpenCV_LIBS} gflags )
 add_executable( run_spherical_sfm run_spherical_sfm.cpp )
 target_link_libraries( run_spherical_sfm sphericalsfmtools gflags )
 
-add_executable( anms_feature_extractor anms_feature_extractor.cpp )
-target_link_libraries( anms_feature_extractor sphericalsfmtools gflags )
-
 add_executable( run_spherical_sfm_uncalib run_spherical_sfm_uncalib.cpp )
 target_link_libraries( run_spherical_sfm_uncalib sphericalsfmtools gflags )
 
