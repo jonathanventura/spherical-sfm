@@ -94,3 +94,8 @@ You can view these example panoramas in a WebVR-compatible browser or headset.
 * [Owheo Courtyard](webviewer/index.html?name=owheo)
 * [Street](webviewer/index.html?name=street)
 
+### PhoneSweep Dataset
+
+Find the [PhoneSweep Dataset](https://osf.io/tjc3x/) from our ICCV 2025 paper hosted on [OSF](https://osf.io/tjc3x/).
+
+The dataset contains 13 outward spherical motion captures with pseudo-ground truth camera poses and intrinsics.
