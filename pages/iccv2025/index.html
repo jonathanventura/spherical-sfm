@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Uncalibrated Structure from Motion on a Sphere</title>
+<style>
+body {
+  font-family: -apple-system, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+
+margin: 0 auto;
+padding: 30px 20px 50px;
+max-width: 800px;
+}
+h1 { 
+text-align: center;
+}
+.venue {
+text-align: center;
+}
+.authors {
+text-align: center;
+}
+.video {
+text-align: center;
+}
+
+.links {
+text-align: center;
+color: #3273dc;
+}
+a:link {
+color: #3273dc;
+}
+
+.thumbnails {
+    padding: 10px;
+    width: 100%;
+    margin: auto;
+}
+
+.thumbnail {
+    position: relative;
+    width: 100%;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.082);
+    margin: 20px 0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.thumbnail img {
+    display: inline-block;
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.button-wrapper {
+    display: flex;
+    background:white;
+
+}
+
+.button-wrapper button {
+    padding: 10px 15px;
+    font-size: 16px;
+    font-family: inherit;
+    margin:0;
+    background-color: white;
+    color: #3273dc;
+    border: 1px solid rgb(241, 241, 241);
+    width: 100%;
+    cursor: pointer;
+
+}
+.button-wrapper button:nth-child(1) {
+    border-bottom-left-radius: 10px;
+}
+
+.button-wrapper button:nth-child(3) {
+    border-bottom-right-radius: 10px;
+}
+
+
+
+</style>
+</head>
+<body>
+<h1>Uncalibrated Structure From Motion on a Sphere</h1>
+<p class=authors>Jonathan Ventura<sup>1</sup>&nbsp;
+Viktor Larsson<sup>2</sup>&nbsp;
+Fredrik Kahl<sup>3</sup><br>
+<p class=authors>
+<sup>1</sup>California Polytechnic State University&nbsp;
+<sup>2</sup>Lund University&nbsp;
+<sup>3</sup>Chalmers University of Technology<br>
+<p class=venue>ICCV 2025</p>
+<hr>
+
+<h3 class="links">
+<a href="assets/ventura_iccv2025.pdf">[Paper]</a>  |
+<a href="https://osf.io/tjc3x/">[Dataset]</a>  |
+<a href="https://github.com/jonathanventura/spherical-sfm">[Code]</a>
+</h3>
+<h3>Abstract</h3>
+<p>Spherical motion is a special case of camera motion where
+the camera moves on the imaginary surface of a sphere with
+the optical axis normal to the surface. Common sources of
+spherical motion are a person capturing a stereo panorama
+with a phone held in an outstretched hand, or a hemi-
+spherical camera rig used for multi-view scene capture.
+However, traditional structure-from-motion pipelines tend
+to fail on spherical camera motion sequences, especially
+when the camera is facing outward. Building upon prior
+work addressing the calibrated case, we explore uncalibrated
+reconstruction from spherical motion, assuming a
+fixed but unknown focal length parameter. We show that,
+although two-view spherical motion is always a critical
+case, self-calibration is possible from three or more views.
+Through analysis of the relationship between focal length
+and spherical relative pose, we devise a global structure-
+from-motion approach for uncalibrated reconstruction. We
+demonstrate the effectiveness of our approach on real-world
+captures in various settings, even when the camera motion
+deviates from perfect spherical motion.</p>
+
+<h3>View Synthesis Results</h3>
+<p class=video>
+<iframe width="800" height="450" src="https://www.youtube.com/embed/mrLONoM5H6s?si=68j1JHrN7AFNvatf" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+</p>
+
+<h3>Acknowledgments</h3>
+This work was supported by the National Science Foundation under Award No. 2144822, the Wallenberg AI, Autonomous Systems
+and Software Program (WASP) funded by the Knut and Alice Wallenberg Foundation, the strategic research project ELLIIT, and the
+Swedish Research Council (grant no. 2023-05424).
+
+</body>
+</html>
+
