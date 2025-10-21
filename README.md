@@ -4,7 +4,7 @@
 
 Code for our papers:
 
-Ventura, J., V. Larsson, F. Kahl.  "Uncalibrated Structure from Motion on a Sphere", International Conference on Computer Vision (ICCV), 2025.
+Ventura, J., V. Larsson, F. Kahl.  "[Uncalibrated Structure from Motion on a Sphere](blob:https://github.com/e30746a7-a1b3-4ce9-939f-4897e3bd7a0d)", International Conference on Computer Vision (ICCV), 2025.
 
 Baker, L., S. Mills, S. Zollmann, and J. Ventura, "CasualStereo: Casual Capture of Stereo Panoramas with Spherical Structure-from-Motion", IEEE Conference on Virtual Reality and 3D User Interfaces (VR), 2020.
 
