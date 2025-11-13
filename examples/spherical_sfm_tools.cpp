@@ -176,7 +176,7 @@ namespace sphericalsfmtools {
     DetectorTracker::DetectorTracker( double _min_dist, double _xradius, double _yradius ) :
         min_dist(_min_dist), xradius(_xradius), yradius(_yradius), sift(cv::SIFT::create(20000)) { }
         
-    void DetectorTracker::detect( const cv::Mat &image, Features &features )
+    void DetectorTracker::detect( const cv::Mat &color_image, const cv::Mat &image, Features &features )
     {
         assert( image.type() == CV_8UC1 );
         
@@ -203,6 +203,7 @@ namespace sphericalsfmtools {
         {
             features.points.push_back( keypoints[i].pt );
             features.descs.push_back( descs.row(i) );
+            features.colors.push_back( sample_image( color_image, keypoints[i].pt ) );
         }
     }
 
@@ -272,14 +273,20 @@ namespace sphericalsfmtools {
         cv::VideoCapture cap(videopath);
         
         int i = 0;
-        cv::Mat image_in, image;
+        cv::Mat image_in, color_image, image;
         while ( cap.read(image_in) )
         {
-            if ( image_in.channels() == 3 ) cv::cvtColor( image_in, image, cv::COLOR_BGR2GRAY );
-            else image = image_in;
+            if ( image_in.channels() == 3 ) {
+	        color_image = image_in;
+	        cv::cvtColor( image_in, image, cv::COLOR_BGR2GRAY );
+	    } else {
+                image = image_in;
+	        cv::cvtColor( image_in, color_image, cv::COLOR_GRAY2BGR );
+	    }
             Features features;
             keyframes.push_back(Keyframe(i,"",features));
             image.copyTo(keyframes[keyframes.size()-1].image);
+            color_image.copyTo(keyframes[keyframes.size()-1].color_image);
             i++;
         }
     
@@ -294,7 +301,7 @@ namespace sphericalsfmtools {
         {
             Keyframe &keyframe = keyframes[i];
             DetectorTracker detector;
-            detector.detect( keyframe.image, keyframe.features );
+            detector.detect( keyframe.color_image, keyframe.image, keyframe.features );
             //std::cout << "image " << i << " has " << keyframe.features.size() << " features\n";
         }
     }

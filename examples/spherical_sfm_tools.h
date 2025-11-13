@@ -32,6 +32,7 @@ namespace sphericalsfmtools {
         int index;
         std::string name;
         Features features;
+        cv::Mat color_image;
         cv::Mat image;
         Keyframe( const int _index, const std::string &_name, const Features &_features ) :
         index(_index), name(_name), features(_features) { }
@@ -58,7 +59,7 @@ namespace sphericalsfmtools {
     public:
         DetectorTracker( double _min_dist=0, double _xradius=0, double _yradius=0 );
         
-        void detect( const cv::Mat &image, Features &features );
+        void detect( const cv::Mat &gray_image, const cv::Mat &image, Features &features );
         void track( cv::Mat &image0, cv::Mat &image1,
                     const Features &features0, Features &features1,
                     Matches &m01 );
