@@ -50,10 +50,14 @@ target_link_libraries( run_spherical_sfm_uncalib sphericalsfmtools gflags )
 
 set( BUILD_STITCHER FALSE CACHE BOOL "Build stereo panorama stitcher app (requires Cuda)" )
 if ( BUILD_STITCHER )
+    add_library( stereopanoramatools
+        stereo_panorama_tools.h stereo_panorama_tools.cpp
+    )
+    target_link_libraries( stereopanoramatools ${OpenCV_LIBS} )
     add_executable( make_stereo_panorama make_stereo_panorama.cpp )
-    target_link_libraries( make_stereo_panorama sphericalsfmtools gflags )
+    target_link_libraries( make_stereo_panorama stereopanoramatools sphericalsfmtools gflags )
     add_executable( make_circle_views make_circle_views.cpp )
-    target_link_libraries( make_circle_views sphericalsfmtools gflags )
+    target_link_libraries( make_circle_views stereopanoramatools sphericalsfmtools gflags )
 endif ()
 
 add_executable( test_spherical_relpose test_spherical_relpose.cpp )
